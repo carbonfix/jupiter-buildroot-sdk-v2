@@ -43,6 +43,14 @@ struct pstore_blk_config {
 	unsigned long ftrace_size;
 };
 
+#ifdef CONFIG_MMC_SDHCI_OF_K1X_PANIC
+struct bdev_info {
+	struct block_device *bdev;
+	dev_t devt;
+	sector_t nr_sects;
+	sector_t start_sect;
+};
+#endif
 /**
  * pstore_blk_get_config - get a copy of the pstore_blk backend configuration
  *
@@ -51,5 +59,23 @@ struct pstore_blk_config {
  * Failure returns negative error code, and success returns 0.
  */
 int pstore_blk_get_config(struct pstore_blk_config *info);
+enum pstore_blk_notifier_type {
+	PSTORE_BLK_BACKEND_REGISTER = 1,
+	PSTORE_BLK_BACKEND_PANIC_DRV_REGISTER,
+	PSTORE_BLK_BACKEND_UNREGISTER,
+	PSTORE_BLK_BACKEND_PANIC_DRV_UNREGISTER,
+};
 
+typedef	int (*pstore_blk_notifier_fn_t)(enum pstore_blk_notifier_type type,
+		struct pstore_device_info *dev);
+struct pstore_blk_notifier {
+	struct notifier_block nb;
+	pstore_blk_notifier_fn_t notifier_call;
+};
+
+extern int register_pstore_device(struct pstore_device_info *dev);
+extern void unregister_pstore_device(struct pstore_device_info *dev);
+
+extern int register_pstore_blk_panic_notifier(struct pstore_blk_notifier *pbn);
+extern void unregister_pstore_blk_panic_notifier(struct pstore_blk_notifier *nb);
 #endif

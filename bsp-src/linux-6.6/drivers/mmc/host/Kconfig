@@ -277,6 +277,18 @@ config MMC_SDHCI_OF_K1X
 
 	  If unsure, say N.
 
+config MMC_SDHCI_OF_K1X_PANIC
+	tristate "SDHCI OF support for the Spacemit K1X SDHCI PANIC WIRTE"
+	depends on MMC_SDHCI_OF_K1X
+	depends on PSTORE_BLK
+	help
+	  This selects the Secure Digital Host Controller Interface (SDHCI)
+	  found in the Spacemit SoC K1X panic write for pstore.
+
+	  If you have a controller with this interface, say Y or M here.
+
+	  If unsure, say N.
+
 config MMC_SDHCI_CADENCE
 	tristate "SDHCI support for the Cadence SD/SDIO/eMMC controller"
 	depends on MMC_SDHCI_PLTFM

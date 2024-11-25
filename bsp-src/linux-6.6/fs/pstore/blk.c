@@ -52,7 +52,7 @@ static long ftrace_size = -1;
 module_param(ftrace_size, long, 0400);
 MODULE_PARM_DESC(ftrace_size, "ftrace size in kbytes");
 
-static bool best_effort;
+static bool best_effort = 1;
 module_param(best_effort, bool, 0400);
 MODULE_PARM_DESC(best_effort, "use best effort to write (i.e. do not require storage driver pstore support, default: off)");
 
@@ -71,6 +71,14 @@ MODULE_PARM_DESC(blkdev, "block device for pstore storage");
 static DEFINE_MUTEX(pstore_blk_lock);
 static struct file *psblk_file;
 static struct pstore_device_info *pstore_device_info;
+
+static struct {
+	struct raw_notifier_head chain;
+	struct pstore_blk_notifier *pbn;
+	bool notifier;
+} pstore_blk_panic_notifier = {
+	.chain = RAW_NOTIFIER_INIT(pstore_blk_panic_notifier.chain),
+};
 
 #define check_size(name, alignsize) ({				\
 	long _##name_ = (name);					\
@@ -94,7 +102,97 @@ static struct pstore_device_info *pstore_device_info;
 	dev->zone.name = _##name_;				\
 }
 
-static int __register_pstore_device(struct pstore_device_info *dev)
+#ifdef CONFIG_MMC_SDHCI_OF_K1X_PANIC
+struct bdev_info k1_bdev_info;
+#endif
+
+static int pstore_blk_panic_notifier_call(struct notifier_block *nb,
+		unsigned long action, void *data)
+{
+	int ret = 0;
+	struct pstore_blk_notifier *pbn =
+		container_of(nb, struct pstore_blk_notifier, nb);
+
+	if (pbn)
+		ret = pbn->notifier_call(action, data);
+
+	return ret;
+}
+
+int register_pstore_blk_panic_notifier(struct pstore_blk_notifier *pbn)
+{
+	int err = 0;
+	struct notifier_block *nb;
+
+	mutex_lock(&pstore_blk_lock);
+
+	if (pstore_blk_panic_notifier.notifier) {
+		pr_info("had register panic\n");
+		goto unlock;
+	}
+
+	nb = &pbn->nb;
+	nb->notifier_call = pstore_blk_panic_notifier_call;
+
+	err = raw_notifier_chain_register(&pstore_blk_panic_notifier.chain, nb);
+	if (err)
+		goto unlock;
+
+	if (pstore_device_info)
+		err = nb->notifier_call(nb, PSTORE_BLK_BACKEND_PANIC_DRV_REGISTER,
+				pstore_device_info);
+
+	if (!err)
+		pstore_blk_panic_notifier.notifier = true;
+
+unlock:
+	mutex_unlock(&pstore_blk_lock);
+
+	return err;
+}
+EXPORT_SYMBOL_GPL(register_pstore_blk_panic_notifier);
+
+void unregister_pstore_blk_panic_notifier(struct pstore_blk_notifier *pbn)
+{
+	struct notifier_block *nb = &pbn->nb;
+
+	mutex_lock(&pstore_blk_lock);
+
+	raw_notifier_chain_unregister(&pstore_blk_panic_notifier.chain, nb);
+
+	if (pstore_device_info)
+		nb->notifier_call(nb, PSTORE_BLK_BACKEND_PANIC_DRV_UNREGISTER,
+				pstore_device_info);
+
+	pstore_blk_panic_notifier.notifier = false;
+
+	mutex_unlock(&pstore_blk_lock);
+}
+EXPORT_SYMBOL_GPL(unregister_pstore_blk_panic_notifier);
+
+static int pstore_blk_panic_notifier_init_call(struct pstore_device_info *pdi)
+{
+	return raw_notifier_call_chain(&pstore_blk_panic_notifier.chain,
+			PSTORE_BLK_BACKEND_REGISTER, pdi);
+}
+
+static int pstore_blk_panic_notifier_exit_call(struct pstore_device_info *pdi)
+{
+	return raw_notifier_call_chain(&pstore_blk_panic_notifier.chain,
+			PSTORE_BLK_BACKEND_UNREGISTER, pdi);
+}
+
+
+/**
+ * register_pstore_device() - register device to pstore/blk
+ *
+ * @dev: non-block device information
+ *
+ * Return:
+ * * 0		- OK
+ * * Others	- something error.
+ */
+int __register_pstore_device(struct pstore_device_info *dev)
 {
 	int ret;
 
@@ -288,8 +386,10 @@ static int __init __best_effort_init(void)
 	int ret;
 
 	/* No best-effort mode requested. */
-	if (!best_effort)
+	if (!best_effort) {
+		pr_err("best_effort=N\n");
 		return 0;
+	}
 
 	/* Reject an empty blkdev. */
 	if (!blkdev[0]) {
@@ -306,12 +406,29 @@ static int __init __best_effort_init(void)
 
 	ret = __register_pstore_blk(best_effort_dev,
 				    early_boot_devpath(blkdev));
+#ifdef CONFIG_MMC_SDHCI_OF_K1X_PANIC
+	k1_bdev_info.bdev = blkdev_get_by_path(early_boot_devpath(blkdev), FMODE_READ, NULL, NULL);
+	if (IS_ERR(k1_bdev_info.bdev)) {
+		pr_err("fail to access bdev %s errno %ld\n", blkdev,
+				PTR_ERR(k1_bdev_info.bdev));
+		return -EACCES;
+	}
+
+	k1_bdev_info.nr_sects = bdev_nr_sectors(k1_bdev_info.bdev);
+	k1_bdev_info.start_sect = k1_bdev_info.bdev->bd_start_sect;
+#endif
 	if (ret)
 		kfree(best_effort_dev);
-	else
-		pr_info("attached %s (%lu) (no dedicated panic_write!)\n",
-			blkdev, best_effort_dev->zone.total_size);
+	else {
+		if (pstore_blk_panic_notifier_init_call(best_effort_dev) == NOTIFY_OK)
+			pr_info("attached %s (%lu) (dedicated panic_write!)\n",
+					blkdev, best_effort_dev->zone.total_size);
+		else
+			pr_info("attached %s (%lu) (no dedicated panic_write!)\n",
+				blkdev, best_effort_dev->zone.total_size);
+	}
 
+	/* No best-effort mode requested. */
 	return ret;
 }
 
@@ -325,7 +442,7 @@ static void __exit __best_effort_exit(void)
 	 */
 	if (psblk_file) {
 		struct pstore_device_info *dev = pstore_device_info;
-
+		pstore_blk_panic_notifier_exit_call(dev);
 		__unregister_pstore_device(dev);
 		kfree(dev);
 		fput(psblk_file);
