@@ -4,6 +4,7 @@ ccflags-y += -include $(srctree)/drivers/gpu/drm/img-rogue/config_kernel.h \
  -I$(srctree)/$(src)/km \
  -I$(srctree)/$(src)/spacemit \
  -I$(srctree)/$(src)
+ccflags-$(CONFIG_POWERVR_DVFS) += -I$(srctree)/drivers/devfreq
 
 obj-$(CONFIG_POWERVR_ROGUE) += pvrsrvkm.o
 pvrsrvkm-y += \
@@ -153,6 +154,7 @@ pvrsrvkm-y += \
  rgxkicksync.o \
  pvr_sync_ioctl_common.o \
  pvr_sync_ioctl_drm.o
+pvrsrvkm-$(CONFIG_POWERVR_DVFS)   += pvr_dvfs_device.o pvr_dvfs_common.o
 pvrsrvkm-$(CONFIG_ARM)   += osfunc_arm.o
 pvrsrvkm-$(CONFIG_ARM64) += osfunc_arm64.o
 pvrsrvkm-$(CONFIG_EVENT_TRACING) += trace_events.o pvr_gputrace.o
