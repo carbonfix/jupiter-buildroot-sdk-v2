@@ -1,8 +1,10 @@
 /*************************************************************************/ /*!
 @File
-@Title          System Description Header
+@Title          SO Interface header file for devices/RGX functions
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    This header provides system-specific declarations and macros
+@Description    Contains SO interface functions. These functions are defined in
+                the common devices layer and are called from the env layer OS
+                specific implementation.
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,27 +43,53 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#include "pvrsrv_device.h"
-#include "rgxdevice.h"
+#if !defined(SOFUNC_RGX_H_)
+#define SOFUNC_RGX_H_
 
-#if !defined(__SYSCCONFIG_H__)
-#define __SYSCCONFIG_H__
+#include "img_types.h"
+#include "pvrsrv_error.h"
 
-#define SYS_RGX_ACTIVE_POWER_LATENCY_MS (100)
-//for st soc
-#if defined(SUPPORT_LINUX_DVFS)
-#define RGX_ST_CORE_CLOCK_SPEED (409*1000*1000)
-#else
-#define RGX_ST_CORE_CLOCK_SPEED (614*1000*1000)
-#endif
-#define ST_GPU_PBASE        0xcac00000
-#define ST_GPU_SIZE         0x10000
-#define ST_IRQ_GPU          59
 
-unsigned long phys_gpu2cpu(unsigned long phys_addr);
-unsigned long phys_cpu2gpu(unsigned long phys_addr);
-/*****************************************************************************
- * system specific data structures
- *****************************************************************************/
+#if !defined(NO_HARDWARE)
+/*!
+*******************************************************************************
 
-#endif	/* __SYSCCONFIG_H__ */
+ @Function     SORgxGpuUtilStatsRegister
+
+ @Description  SO Interface function called from the OS layer implementation.
+               Initialise data used to compute GPU utilisation statistics
+               for a particular user (identified by the handle passed as
+               argument). This function must be called only once for each
+               different user/handle.
+
+ @Input        phGpuUtilUser - Pointer to handle used to identify a user of
+                               RGXGetGpuUtilStats
+
+ @Return       PVRSRV_ERROR
+
+******************************************************************************/
+PVRSRV_ERROR SORgxGpuUtilStatsRegister(IMG_HANDLE *phGpuUtilUser);
+
+
+/*!
+*******************************************************************************
+
+ @Function     SORgxGpuUtilStatsUnregister
+
+ @Description  SO Interface function called from the OS layer implementation.
+               Free data previously used to compute GPU utilisation statistics
+               for a particular user (identified by the handle passed as
+               argument).
+
+ @Input        hGpuUtilUser - Handle used to identify a user of
+                              RGXGetGpuUtilStats
+
+ @Return       PVRSRV_ERROR
+
+******************************************************************************/
+PVRSRV_ERROR SORgxGpuUtilStatsUnregister(IMG_HANDLE hGpuUtilUser);
+#endif /* !defined(NO_HARDWARE) */
+
+
+
+#endif /* SOFUNC_RGX_H_ */

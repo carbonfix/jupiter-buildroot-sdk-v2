@@ -309,6 +309,9 @@ struct st_context *RgxStInit(PVRSRV_DEVICE_CONFIG* psDevConfig)
 
 	platform->dev_config = psDevConfig;
 	platform->gpu_active = IMG_FALSE;
+
+#if 0
+//Conflict with settings in sysconfig. c
 #if defined(SUPPORT_LINUX_DVFS) && !defined(NO_HARDWARE)
 	psDevConfig->sDVFS.sDVFSDeviceCfg.bIdleReq = IMG_TRUE;
 	psDevConfig->sDVFS.sDVFSDeviceCfg.pfnSetFrequency = stSetFrequency;
@@ -322,6 +325,7 @@ struct st_context *RgxStInit(PVRSRV_DEVICE_CONFIG* psDevConfig)
 		PVR_DPF((PVR_DBG_ERROR, "RgxStInit: spacemit_power_model_simple_init fail"));
 		goto fail;
 	}
+#endif
 #endif
 #endif
 	platform->bEnablePd = IMG_FALSE;

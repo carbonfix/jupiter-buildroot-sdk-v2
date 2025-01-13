@@ -1,8 +1,7 @@
 /*************************************************************************/ /*!
-@File
-@Title          System Description Header
+@File           pvr_dvfs.c
+@Title          System level interface for DVFS
 @Copyright      Copyright (c) Imagination Technologies Ltd. All Rights Reserved
-@Description    This header provides system-specific declarations and macros
 @License        Dual MIT/GPLv2
 
 The contents of this file are subject to the MIT license as set out below.
@@ -41,27 +40,23 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */ /**************************************************************************/
 
-#include "pvrsrv_device.h"
-#include "rgxdevice.h"
+#ifndef PVR_DVFS_DEVICE_H
+#define PVR_DVFS_DEVICE_H
 
-#if !defined(__SYSCCONFIG_H__)
-#define __SYSCCONFIG_H__
+#include "opaque_types.h"
+#include "pvrsrv_error.h"
 
-#define SYS_RGX_ACTIVE_POWER_LATENCY_MS (100)
-//for st soc
-#if defined(SUPPORT_LINUX_DVFS)
-#define RGX_ST_CORE_CLOCK_SPEED (409*1000*1000)
-#else
-#define RGX_ST_CORE_CLOCK_SPEED (614*1000*1000)
-#endif
-#define ST_GPU_PBASE        0xcac00000
-#define ST_GPU_SIZE         0x10000
-#define ST_IRQ_GPU          59
 
-unsigned long phys_gpu2cpu(unsigned long phys_addr);
-unsigned long phys_cpu2gpu(unsigned long phys_addr);
-/*****************************************************************************
- * system specific data structures
- *****************************************************************************/
+PVRSRV_ERROR InitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode);
 
-#endif	/* __SYSCCONFIG_H__ */
+void DeinitDVFS(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+PVRSRV_ERROR RegisterDVFSDevice(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+void UnregisterDVFSDevice(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+PVRSRV_ERROR SuspendDVFS(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+PVRSRV_ERROR ResumeDVFS(PPVRSRV_DEVICE_NODE psDeviceNode);
+
+#endif /* PVR_DVFS_DEVICE_H */

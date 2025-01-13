@@ -60,6 +60,20 @@ static PVRSRV_DEVICE_CONFIG		gsDevices[1];
 static PHYS_HEAP_FUNCTIONS		gsPhysHeapFuncs;
 static PHYS_HEAP_CONFIG			gsPhysHeapConfig[3];
 
+#if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
+
+static const IMG_OPP asOPPTable[] =
+{
+	{ 8,  409 * 1000 * 1000},
+	{ 8,  491 * 1000 * 1000},
+	{ 8,  614 * 1000 * 1000},
+	{ 8,  819 * 1000 * 1000},
+};
+
+#define LEVEL_COUNT (sizeof(asOPPTable) / sizeof(IMG_OPP))
+
+#endif
+
 /*
 	CPU to Device physical address translation
 */
@@ -209,6 +223,20 @@ PVRSRV_ERROR SysDevInit(void *pvOSDevice, PVRSRV_DEVICE_CONFIG **ppsDevConfig)
 		gsDevices[0].pvOSDevice = NULL;
 		return PVRSRV_ERROR_OUT_OF_MEMORY;
 	}
+
+#if defined(SUPPORT_LINUX_DVFS) || defined(SUPPORT_PDVFS)
+	/* Fake DVFS configuration used purely for testing purposes */
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.pasOPPTable = asOPPTable;
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.ui32OPPTableSize = LEVEL_COUNT;
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.pfnSetFrequency = stSetFrequency;
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.pfnSetVoltage = stSetVoltage;
+#endif
+#if defined(SUPPORT_LINUX_DVFS)
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.ui32PollMs = 300;
+	gsDevices[0].sDVFS.sDVFSDeviceCfg.bIdleReq = IMG_TRUE;
+	gsDevices[0].sDVFS.sDVFSGovernorCfg.ui32UpThreshold = 75;
+	gsDevices[0].sDVFS.sDVFSGovernorCfg.ui32DownDifferential = 15;
+#endif
 
 	/* Setup other system specific stuff */
 #if defined(SUPPORT_ION)
