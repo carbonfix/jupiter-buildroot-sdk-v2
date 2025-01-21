@@ -212,6 +212,7 @@ static void serial_pxa_stop_tx(struct uart_port *port)
 {
 	struct uart_pxa_port *up = (struct uart_pxa_port *)port;
 	unsigned int timeout = 0x100000 / up->cons_udelay;
+	unsigned long flags;
 
 	if (up->dma_enable) {
 		up->uart_dma.tx_stop = 1;
@@ -228,8 +229,15 @@ static void serial_pxa_stop_tx(struct uart_port *port)
 			 */
 			while (dma_async_is_tx_complete(up->uart_dma.txdma_chan,
 				   up->uart_dma.tx_cookie, NULL, NULL)
-				!= DMA_COMPLETE && (timeout-- > 0))
+				!= DMA_COMPLETE && (timeout-- > 0)) {
+				spin_unlock(&up->port.lock);
+				local_irq_save(flags);
+				local_irq_enable();
 				udelay(up->cons_udelay);
+				local_irq_disable();
+				local_irq_restore(flags);
+				spin_lock(&up->port.lock);
+			}
 
 			BUG_ON(timeout == 0);
 		}
