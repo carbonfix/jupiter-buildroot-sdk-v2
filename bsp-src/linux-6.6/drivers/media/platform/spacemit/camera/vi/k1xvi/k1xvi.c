@@ -487,6 +487,11 @@ static int k1xvi_probe(struct platform_device *pdev)
 		cam_err("%s k1xvi_create_entity_links failed ret=%d.", __func__, ret);
 		goto entities_fail;
 	}
+
+	ret = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(33));
+	if (ret)
+		return ret;
+
 	drvdata->isp_firm = g_isp_firm;
 	drvdata->pdev = pdev;
 	platform_set_drvdata(pdev, drvdata);

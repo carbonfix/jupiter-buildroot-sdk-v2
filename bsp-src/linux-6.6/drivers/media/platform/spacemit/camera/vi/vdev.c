@@ -1566,7 +1566,7 @@ static long spm_vdev_vidioc_default(struct file *file,
 		cam_dbg("VIDIOC_G_SLICE_MODE slice_mode(%d) %s", *slice_mode, sc_vnode->name);
 		break;
 	case VIDIOC_QUERY_SLICE_READY:
-		cam_not("query slice info ready");
+		//cam_not("query slice info ready");
 		BUG_ON(!pipe);
 		sc_pipeline = media_pipeline_to_sc_pipeline(pipe);
 		BUG_ON(!sc_pipeline);
