@@ -299,8 +299,6 @@ static int done(struct mv_ep *ep, struct mv_req *req, int status)
 
 	ep->stopped = 1;
 
-	spin_unlock(&ep->udc->lock);
-
 	if (!(list_empty(&ep->queue))) {
 		struct mv_req *curr_req, *temp_req;
 		u32 bit_pos, direction;
@@ -310,8 +308,10 @@ static int done(struct mv_ep *ep, struct mv_req *req, int status)
 		dqh = &(udc->ep_dqh[ep->ep_num * 2 + direction]);
 		bit_pos = 1 << (((direction == EP_DIR_OUT) ? 0 : 16) + ep->ep_num);
 
-		if ((readl(&udc->op_regs->epstatus) & bit_pos) || (readl(&udc->op_regs->epprime) & bit_pos))
+		if ((readl(&udc->op_regs->epstatus) & bit_pos) || (readl(&udc->op_regs->epprime) & bit_pos)) {
+			spin_unlock(&ep->udc->lock);
 			goto skip_prime_again;
+		}
 
 		list_for_each_entry_safe(curr_req, temp_req, &ep->queue, queue)
 			if (curr_req->head->size_ioc_sts & DTD_STATUS_ACTIVE) {
@@ -323,6 +323,8 @@ static int done(struct mv_ep *ep, struct mv_req *req, int status)
 				break;
 			}
 	}
+
+	spin_unlock(&ep->udc->lock);
 
 skip_prime_again:
 	/*
