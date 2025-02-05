@@ -422,13 +422,6 @@
 		#size-cells = <2>;
 		ranges;
 
-		/* sram area, used for rcpu code & data & heap space */
-		rcpu_mem_0: mem@c0800000 {
-			reg = <0x0 0xc0800000 0x0 0x40000>;
-			da_base = <0x0>;
-			no-map;
-		};
-
 		/* rcpu's heap */
 		rcpu_mem_heap: rcpu_mem_heap@30000000 {
 			reg = <0x0 0x30000000 0x0 0x200000>;
@@ -460,15 +453,9 @@
 			no-map;
 		};
 
-		/* memory snapshots of rcpu when rcpu poweroff */
-		rcpu_mem_snapshots: rcpu_mem_snapshots@30300000 {
-			reg = <0x0 0x30300000 0x0 0x40000>;
-			no-map;
-		};
-
-		/* the dtb file of rcpu */
-		rcpu_mem_dtb: rcpu_mem_dtb@30300000 {
-			reg = <0x0 0x30340000 0x0 0x40000>;
+		/* used for rcpu code & data & bss space */
+		rcpu_mem_0: rcpu_mem_0@30300000 {
+			reg = <0x0 0x30300000 0x0 0x200000>;
 			no-map;
 		};
 	};
@@ -998,7 +985,7 @@
 			reg =  <0 0xc088c000 0 0x1000>,
 				<0 0xc0880000 0 0x200>;
 			ddr-remap-base = <0x30000000>;
-			esos-entry-point = <0x114>;
+			esos-entry-point = <0x30300114>;
 			clocks = <&ccu CLK_AUDIO>;
 			clock-names = "core";
 			resets = <&reset RESET_AUDIO_SYS>;
