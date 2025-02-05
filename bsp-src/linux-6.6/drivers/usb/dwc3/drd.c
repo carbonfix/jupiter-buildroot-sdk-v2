@@ -453,14 +453,14 @@ static int dwc3_usb_role_switch_set(struct usb_role_switch *sw,
 	case USB_ROLE_DEVICE:
 		mode = DWC3_GCTL_PRTCAP_DEVICE;
 #ifdef CONFIG_SOC_SPACEMIT_K1X
-		if (dwc->monitor_vbus && dwc->gadget)
+		if (dwc->monitor_vbus && dwc->gadget_driver && dwc->gadget)
 			usb_gadget_vbus_connect(dwc->gadget);
 		break;
 #endif
 #ifdef CONFIG_SOC_SPACEMIT_K1X
 	case USB_ROLE_NONE:
 		mode = DWC3_GCTL_PRTCAP_DEVICE;
-		if (dwc->monitor_vbus && dwc->gadget)
+		if (dwc->monitor_vbus && dwc->gadget_driver && dwc->gadget)
 			usb_gadget_vbus_disconnect(dwc->gadget);
 #endif
 		break;
