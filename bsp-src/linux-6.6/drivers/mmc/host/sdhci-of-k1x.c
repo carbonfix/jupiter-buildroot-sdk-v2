@@ -1240,6 +1240,7 @@ static int spacemit_sdhci_execute_sw_tuning(struct sdhci_host *host, u32 opcode)
 	}
 
 	/* specify cpu freq during tuning rx windows if current cpufreq exceed 1.6G */
+#ifdef CONFIG_CPU_FREQ
 	if (pdata->rx_tuning_freq) {
 		clk_rate = cpufreq_generic_get(0);
 		if (clk_rate && (clk_rate != pdata->rx_tuning_freq)) {
@@ -1254,7 +1255,7 @@ static int spacemit_sdhci_execute_sw_tuning(struct sdhci_host *host, u32 opcode)
 			}
 		}
 	}
-
+#endif
 	rxtuning->select_delay_num = 0;
 	rxtuning->current_delay_index = 0;
 	memset(rxtuning->windows, 0, sizeof(rxtuning->windows));
@@ -1286,11 +1287,13 @@ static int spacemit_sdhci_execute_sw_tuning(struct sdhci_host *host, u32 opcode)
 		mmc_hostname(mmc), rxtuning->select_delay[0]);
 
 restore_freq:
+#ifdef CONFIG_CPU_FREQ
 	if (pdata->rx_tuning_freq && policy) {
 		if (clk_rate)
 			cpufreq_driver_target(policy, clk_rate, 0);
 		cpufreq_cpu_put(policy);
 	}
+#endif
 	return ret;
 }
 
