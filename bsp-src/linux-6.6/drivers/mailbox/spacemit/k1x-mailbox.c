@@ -67,6 +67,10 @@ static irqreturn_t spacemit_mbox_irq(int irq, void *dev_id)
 
 		/* clear the irq pending */
 		writel(1 << i, (void __iomem *)&mbox->regs->ipc_icr);
+
+		/* then send an ack */
+		writel(1 << (i + SPACEMIT_TX_ACK_OFFSET), (void __iomem *)&mbox->regs->ipc_isrw);
+
 	}
 
 	return IRQ_HANDLED;
