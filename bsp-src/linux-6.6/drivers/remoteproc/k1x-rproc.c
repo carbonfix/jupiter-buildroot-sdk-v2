@@ -44,6 +44,7 @@
 #define ESOS_BOOT_ENTRY_REG_OFFSET	0x88
 #define ESOS_BOOTUP_REG_OFFSET		0x30
 #define ESOS_AON_PER_CLK_RST_CTL_REG	0x2c
+#define AUDIO_PMU_VOTE_REG_OFFSET	0x20
 
 #define ESOS_DDR_REGMAP_BASE_REG_OFFSET	0xc0
 
@@ -193,27 +194,7 @@ static int spacemit_rproc_prepare(struct rproc *rproc)
 
 static int spacemit_rproc_start(struct rproc *rproc)
 {
-	loff_t pos = 0;
-	struct file *dtb;
-	const char *dtb_path = "/lib/firmware/dtb.dtb";
-	struct rproc_mem_entry *rcpu_dtb_mem;
 	struct spacemit_rproc *priv = rproc->priv;
-
-	/* load the dtb file of rcpu */
-	rcpu_dtb_mem = rproc_find_carveout_by_name(rproc, "rcpu_mem_dtb");
-	if (!rcpu_dtb_mem) {
-		pr_info("Failed to find the rcpu_dtb_mem\n");
-		/* do not need to dealing with this situation */
-	} else {
-		dtb = filp_open(dtb_path, O_RDWR, 0644);
-		if (IS_ERR(dtb)) {
-			pr_err("filp open %s failed\n", dtb_path);
-			return -1;
-		}
-
-		kernel_read(dtb, rcpu_dtb_mem->va, dtb->f_inode->i_size, &pos);
-		filp_close(dtb, NULL);
-	}
 
 	/* enable ipc2ap clk & reset--> rcpu side */
 	writel(0xff, priv->base[BOOTC_MEM_BASE_OFFSET] + ESOS_AON_PER_CLK_RST_CTL_REG);
@@ -427,8 +408,8 @@ static int rproc_platform_late(void)
 	int ret;
 	unsigned int val;
 	struct rproc *rproc;
+	struct rproc_mem_entry *src_table_mem;
 	struct spacemit_rproc *srproc;
-	struct rproc_mem_entry *rcpu_snapshots_mem;
 	struct platform_device *pdev;
 	struct generic_pm_domain *genpd;
 
@@ -441,15 +422,15 @@ static int rproc_platform_late(void)
 	ret = rpmsg_send(srproc->rpdev->ept, RCPU_ENTER_LOW_PWR_MODE,
 			strlen(RCPU_ENTER_LOW_PWR_MODE));
 
-	rcpu_snapshots_mem = rproc_find_carveout_by_name(rproc, "rcpu_mem_snapshots");
-	if (!rcpu_snapshots_mem) {
+	src_table_mem = rproc_find_carveout_by_name(rproc, "rsc_table");
+	if (!src_table_mem) {
 		pr_err("Failed to find the rcpu_mem_snapshots\n");
 		return -1;
 	}
 
 	while (1) {
-		/* will be wrotten by rpcu */
-		val = readl(rcpu_snapshots_mem->va);
+		/* will be wrotten by rpcu, using the reserved entry of resource table */
+		val = readl(src_table_mem->va + 8);
 		if (val == 1)
 			break;
 	}
@@ -460,9 +441,6 @@ static int rproc_platform_late(void)
 	genpd = pd_to_genpd(pdev->dev.pm_domain);
 
 	pdev->dev.power.wakeup_path = false;
-
-	/* close the clk & power-switch */
-	genpd->domain.ops.suspend_noirq(&pdev->dev);
 
 #ifdef CONFIG_HIBERNATION
 	if (srproc->hinernate_restore)
@@ -477,8 +455,18 @@ static int rproc_platform_late(void)
 		arch_sync_dma_for_device(virt_to_phys(hibernate_rcpu_snapshot),
 				hibernal_snapshot_size,
 				DMA_TO_DEVICE);
+
 	}
 #endif
+	val = readl(srproc->base[BOOTC_MEM_BASE_OFFSET] + AUDIO_PMU_VOTE_REG_OFFSET);
+	/**
+	 * set the vote first
+	 * 0x6E: bit1:standbyen; bit2:sleepen; bit3:vctcxosd; bit5: ddrsd; bit6: axisd
+	 */
+	writel(val | 0x6e, srproc->base[BOOTC_MEM_BASE_OFFSET] + AUDIO_PMU_VOTE_REG_OFFSET);
+
+	/* close the clk & power-switch */
+	genpd->domain.ops.suspend_noirq(&pdev->dev);
 
 	return 0;
 }
@@ -488,7 +476,7 @@ static void rproc_platfrom_wake(void)
 	unsigned int val;
 	struct rproc *rproc;
 	struct spacemit_rproc *srproc;
-	struct rproc_mem_entry *rcpu_sram_mem, *rcpu_snapshots_mem;
+	struct rproc_mem_entry *src_table_mem;
 	struct platform_device *pdev;
 	struct generic_pm_domain *genpd;
 
@@ -508,14 +496,11 @@ static void rproc_platfrom_wake(void)
 	/* enable ipc2ap clk & reset--> rcpu side */
 	writel(0xff, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_AON_PER_CLK_RST_CTL_REG);
 
+	/* set the boot-entry and let the rcpu run to vector0 */
+	writel(rproc->bootaddr & ~0xffff, srproc->base[SYSCTRL_MEM_BASE_OFFSET] + ESOS_BOOT_ENTRY_REG_OFFSET);
+
 	/* set ddr map */
 	writel(srproc->ddr_remap_base, srproc->base[SYSCTRL_MEM_BASE_OFFSET] + ESOS_DDR_REGMAP_BASE_REG_OFFSET);
-
-	rcpu_sram_mem = rproc_find_carveout_by_name(rproc, "mem");
-	if (!rcpu_sram_mem) {
-		pr_err("Failed to find the rcpu_mem_0\n");
-		return;
-	}
 
 #ifdef CONFIG_HIBERNATION
 	if (srproc->hinernate_restore || srproc->hibernate_freeze) {
@@ -530,28 +515,28 @@ static void rproc_platfrom_wake(void)
 	}
 #endif
 
-	rcpu_snapshots_mem = rproc_find_carveout_by_name(rproc, "rcpu_mem_snapshots");
-	if (!rcpu_snapshots_mem) {
+	val = readl(srproc->base[BOOTC_MEM_BASE_OFFSET] + AUDIO_PMU_VOTE_REG_OFFSET);
+	/**
+	 * clear the vote first
+	 * 0x6E: bit1:standbyen; bit2:sleepen; bit3:vctcxosd; bit5: ddrsd; bit6: axisd
+	 */
+	writel(val & ~0x6e, srproc->base[BOOTC_MEM_BASE_OFFSET] + AUDIO_PMU_VOTE_REG_OFFSET);
+
+	/* luaching up rpcu */
+	writel(1, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_BOOTUP_REG_OFFSET);
+
+	src_table_mem = rproc_find_carveout_by_name(rproc, "rsc_table");
+	if (!src_table_mem) {
 		pr_err("Failed to find the rcpu_mem_snapshots\n");
 		return;
 	}
 
-	/* copy the code */
-	memcpy((void *)rcpu_sram_mem->va,
-			(void *)((u32 *)rcpu_snapshots_mem->va + 1),
-			rcpu_sram_mem->len - sizeof(u32));
-
-	/* luaching up rpcu */	
-	writel(1, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_BOOTUP_REG_OFFSET);
-	
 	while (1) {
-		/* will be wrotten by rpcu */
-		val = readl(rcpu_snapshots_mem->va);
+		/* will be wrotten by rpcu: using the reserved entry of resource table */
+		val = readl(src_table_mem->va + 8);
 		if (val == 2)
 			break;
 	}
-
-	memset((void *)rcpu_snapshots_mem->va, 0, rcpu_snapshots_mem->len);
 }
 
 #ifdef CONFIG_HIBERNATION
@@ -759,7 +744,7 @@ static int spacemit_rproc_probe(struct platform_device *pdev)
 				strcmp(it.node->name, "vdev0vring0") == 0 ||
 				strcmp(it.node->name, "rcpu_mem_heap") == 0 ||
 				strcmp(it.node->name, "rsc_table") == 0 ||
-				strcmp(it.node->name, "rcpu_mem_snapshots") == 0) {
+				strcmp(it.node->name, "rcpu_mem_0") == 0 ) {
 
 			hibernal_snapshot_size += rmem->size;
 			if (strcmp(it.node->name, "rcpu_mem_heap") == 0)
