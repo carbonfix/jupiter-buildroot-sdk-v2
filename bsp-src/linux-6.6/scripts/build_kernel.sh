@@ -31,9 +31,12 @@ fi
 command -v riscv64-unknown-linux-gnu-gcc > /dev/null || \
     (echo "Install cross compile and add to PATH" && exit 1)
 
+VERSION=$(grep -oP '^VERSION\s*=\s*\K\d+' Makefile)
+PATCHLEVEL=$(grep -oP '^PATCHLEVEL\s*=\s*\K\d+' Makefile)
+SUBLEVEL=$(grep -oP '^SUBLEVEL\s*=\s*\K\d+' Makefile)
 export ARCH=riscv
 export CROSS_COMPILE=riscv64-unknown-linux-gnu-
-export KERNELRELEASE=6.1.15
+export KERNELRELEASE=$VERSION.$PATCHLEVEL.$SUBLEVEL
 export LOCALVERSION=""
 
 if [ $CLEAN = true ]
@@ -54,7 +57,7 @@ make k1_defconfig
 if [ $BUILD_DEB = true ]
 then
     KDEB_SOURCENAME=linux-riscv-spacemit \
-    KDEB_PKGVERSION=6.1.15-$(TZ=Asia/Shanghai date +"%Y%m%d%H%M%S") \
+    KDEB_PKGVERSION=$KERNELRELEASE-$(TZ=Asia/Shanghai date +"%Y%m%d%H%M%S") \
     KDEB_CHANGELOG_DIST=mantic-porting \
     make -j$(nproc) bindeb-pkg
 else
