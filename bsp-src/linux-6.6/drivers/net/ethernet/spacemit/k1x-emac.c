@@ -313,6 +313,8 @@ int emac_init_hw(struct emac_priv *priv)
 
 	emac_wr(priv, DMA_RECEIVE_IRQ_MITIGATION_CTRL, val);
 
+	emac_wr(priv, MAC_FC_CONTROL, MREGBIT_FC_DECODE_ENABLE);
+
 	/* reset dma */
 	emac_wr(priv, DMA_CONTROL, 0x0000);
 
@@ -930,6 +932,8 @@ int emac_up(struct emac_priv *priv)
 
 	/* allocate buffers for receive descriptors */
 	emac_alloc_rx_desc_buffers(priv);
+
+	phy_set_asym_pause(ndev->phydev,true,false);
 
 	if (ndev->phydev)
 		phy_start(ndev->phydev);
