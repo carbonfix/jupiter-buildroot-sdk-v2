@@ -532,9 +532,14 @@ static int spacemit_snd_pcm_hw_params(struct snd_soc_component *component, struc
 
 	if (dmadata->stream == SNDRV_PCM_STREAM_PLAYBACK
 			&& spacemit_get_stream_is_enable(dev, SNDRV_PCM_STREAM_CAPTURE)) {
-		ret = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(params));
-		if (ret < 0)
+		if (substream->dma_buffer.area != NULL &&
+			substream->dma_buffer.bytes >= params_buffer_bytes(params)) {
+			snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+			substream->runtime->dma_bytes = params_buffer_bytes(params);
+		} else {
+			ret = -EINVAL;
 			goto unlock;
+		}
 	}
 	memset(&slave_config, 0, sizeof(slave_config));
 	memset(&slave_config_tx, 0, sizeof(slave_config_tx));
@@ -568,9 +573,14 @@ static int spacemit_snd_pcm_hw_params(struct snd_soc_component *component, struc
 	if (ret)
 		goto unlock;
 
-	ret = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(params));
-	if (ret < 0)
+	if (substream->dma_buffer.area != NULL &&
+		substream->dma_buffer.bytes >= params_buffer_bytes(params)) {
+		snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
+		substream->runtime->dma_bytes = params_buffer_bytes(params);
+	} else {
+		ret = -EINVAL;
 		goto unlock;
+	}
 
 	dmadata->substream = substream;
 	dmadata->pos = 0;
@@ -1042,6 +1052,7 @@ static int spacemit_snd_pcm_new(struct snd_soc_component *component, struct snd_
 	struct spacemit_snd_soc_device *dev;
 	struct snd_card *card = rtd->card->snd_card;
 	struct snd_pcm *pcm = rtd->pcm;
+	struct snd_pcm_substream *substream;
 
 	pr_debug("%s enter, dev=%s\n", __FUNCTION__, dev_name(rtd->dev));
 
@@ -1072,6 +1083,15 @@ static int spacemit_snd_pcm_new(struct snd_soc_component *component, struct snd_
 
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 		card->dev, 64 * 1024 * 32, 4 * 1024 * 1024);
+
+	for (i = 0; i < chan_num; i++) {
+		substream = pcm->streams[i].substream;
+		if (substream->dma_buffer.area == NULL) {
+			pr_err("%s: %s, preallocate dma buffer failed !!!!\n", __FUNCTION__, dev_name(rtd->dev));
+			ret = -ENOMEM;
+			goto exit;
+		}
+	}
 
 	return 0;
 
