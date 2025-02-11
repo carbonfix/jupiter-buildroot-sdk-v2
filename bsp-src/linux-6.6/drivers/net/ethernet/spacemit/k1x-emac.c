@@ -938,15 +938,7 @@ int emac_up(struct emac_priv *priv)
 	if (ndev->phydev)
 		phy_start(ndev->phydev);
 
-	/* allocates interrupt resources and
-	 * enables the interrupt line and IRQ handling
-	 */
-	ret = request_irq(priv->irq, emac_interrupt_handler,
-			  IRQF_SHARED, ndev->name, ndev);
-	if (ret) {
-		pr_err("request_irq failed\n");
-		goto request_irq_failed;
-	}
+	enable_irq(priv->irq);
 
 	/* enable mac interrupt */
 	emac_wr(priv, MAC_INTERRUPT_ENABLE, 0x0000);
@@ -965,12 +957,6 @@ int emac_up(struct emac_priv *priv)
 	netif_start_queue(ndev);
 	return 0;
 
-request_irq_failed:
-	emac_reset_hw(priv);
-	if (ndev->phydev) {
-		phy_stop(ndev->phydev);
-		phy_disconnect(ndev->phydev);
-	}
 err:
 #ifdef CONFIG_PM_SLEEP
 	pm_runtime_put_sync(&pdev->dev);
@@ -1009,7 +995,7 @@ int emac_down(struct emac_priv *priv)
 	emac_wr(priv, MAC_INTERRUPT_ENABLE, 0x0000);
 	emac_wr(priv, DMA_INTERRUPT_ENABLE, 0x0000);
 
-	free_irq(priv->irq, ndev);
+	disable_irq(priv->irq);
 
 	emac_ptp_deinit(priv);
 
@@ -2758,6 +2744,17 @@ static int emac_probe(struct platform_device *pdev)
 	device_enable_async_suspend(&pdev->dev);
 	netif_napi_add(ndev, &priv->napi, emac_rx_poll);
 
+	/* allocates interrupt resources and
+	 * disable the interrupt line and IRQ handling
+	*/
+	ret = request_irq(priv->irq, emac_interrupt_handler,
+			IRQF_SHARED, ndev->name, ndev);
+	if (ret) {
+		dev_err(&pdev->dev, "request_irq failed\n");
+		goto err_mdio_deinit;
+	}
+	disable_irq(priv->irq);
+
 	return 0;
 err_mdio_deinit:
 	emac_mdio_deinit(priv);
@@ -2787,6 +2784,7 @@ static int emac_remove(struct platform_device *pdev)
 
 	unregister_netdev(priv->ndev);
 	emac_reset_hw(priv);
+	free_irq(priv->irq, priv->ndev);
 	free_netdev(priv->ndev);
 	emac_mdio_deinit(priv);
 	reset_control_assert(priv->reset);
