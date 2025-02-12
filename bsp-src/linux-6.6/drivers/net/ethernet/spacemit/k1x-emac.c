@@ -302,14 +302,14 @@ int emac_init_hw(struct emac_priv *priv)
 	emac_wr(priv, MAC_RECEIVE_PACKET_START_THRESHOLD, priv->rx_threshold);
 
 	/* set emac rx mitigation frame count */
-	val = EMAC_RX_FRAMES & MREGBIT_RECEIVE_IRQ_FRAME_COUNTER_MSK;
+	val = priv->rx_coal_frames & MREGBIT_RECEIVE_IRQ_FRAME_COUNTER_MSK;
 
 	/* set emac rx mitigation timeout */
-	val |= (EMAC_RX_COAL_TIMEOUT << MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_OFST) &
+	val |= (priv->rx_coal_timeout << MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_OFST) &
 		MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_MSK;
 
-	/* disable emac rx irq mitigation */
-	val &= ~MRGEBIT_RECEIVE_IRQ_MITIGATION_ENABLE;
+	/* enable emac rx irq mitigation */
+	val |= MRGEBIT_RECEIVE_IRQ_MITIGATION_ENABLE;
 
 	emac_wr(priv, DMA_RECEIVE_IRQ_MITIGATION_CTRL, val);
 
@@ -2557,6 +2557,20 @@ static int emac_config_dt(struct platform_device *pdev, struct emac_priv *priv)
 				__func__, DEFAULT_DMA_BURST_LEN);
 			priv->dma_burst_len = DEFAULT_DMA_BURST_LEN;
 		}
+	}
+
+	if (of_property_read_u32(np, "rx_coal_frames",
+				 &priv->rx_coal_frames)) {
+		priv->rx_coal_frames = DEFAULT_RX_COAL_FRAMES;
+		dev_dbg(&pdev->dev, "%s rx_coal_frames using default value:%d \n",
+			__func__, priv->rx_coal_frames);
+	}
+
+	if (of_property_read_u32(np, "rx_coal_timeout",
+				 &priv->rx_coal_timeout)) {
+		priv->rx_coal_timeout = DEFAULT_RX_COAL_TIMEOUT;
+		dev_dbg(&pdev->dev, "%s rx_coal_timeout using default value:%d \n",
+			__func__, priv->rx_coal_timeout);
 	}
 
 	if (of_property_read_bool(np, "ref-clock-from-phy")) {

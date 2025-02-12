@@ -454,13 +454,13 @@
 /* 40ms */
 #define EMAC_TX_COAL_TIMEOUT				40000
 
-#define EMAC_RX_FRAMES					64
+#define DEFAULT_RX_COAL_FRAMES				64
 
 /* axi clk 312M, 1us = 312 cycle,
  * every packet almost take 120us when operate at 100Mbps
  * so we set 5 packet delay time which 600us as rx coal timeout
  */
-#define EMAC_RX_COAL_TIMEOUT				(600 * 312)
+#define DEFAULT_RX_COAL_TIMEOUT			(120 * 312)
 
 /* only works for sizes that are powers of 2 */
 #define EMAC_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
@@ -687,6 +687,8 @@ struct emac_priv {
 	u32 tx_count_frames;
 	u32 tx_coal_frames;
 	u32 tx_coal_timeout;
+	u32 rx_coal_frames;
+	u32 rx_coal_timeout;
 	struct timer_list txtimer;
 	struct ptp_clock *ptp_clock;
 	struct ptp_clock_info ptp_clock_ops;
