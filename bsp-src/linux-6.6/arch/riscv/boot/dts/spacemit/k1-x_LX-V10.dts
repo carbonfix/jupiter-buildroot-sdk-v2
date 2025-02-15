@@ -14,7 +14,7 @@
 
 
 / {
-	model = "spacemit k1-x edge-computing board";
+	model = "spacemit k1-x LX-V10 board";
 	modules_usrload = "8852bs";
 
 	cpus: cpus {
