@@ -13,7 +13,7 @@
 #include <linux/regulator/driver.h>
 #include <linux/regulator/of_regulator.h>
 #include <linux/regulator/machine.h>
-
+#include <linux/pm_wakeirq.h>
 #include <linux/acpi.h>
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
@@ -96,6 +96,8 @@ static enum power_supply_usb_type sgm4154x_usb_type[] = {
 	POWER_SUPPLY_USB_TYPE_CDP,
 };
 #endif
+extern int of_irq_get(struct device_node *dev, int index);
+
 static int sgm4154x_usb_notifier(struct notifier_block *nb, unsigned long val,
 				void *priv)
 {
@@ -1551,6 +1553,7 @@ static int sgm4154x_parse_dt(struct sgm4154x_device *sgm)
 	int ret;
 	u32 val = 0;
 	int irq_gpio = 0, irqn = 0;
+	int wakeup_irq = 0;
 	int chg_en_gpio = 0;
 	struct gpio_desc *nqon;
 	#if 0
@@ -1604,6 +1607,13 @@ static int sgm4154x_parse_dt(struct sgm4154x_device *sgm)
 	}
 	sgm->client->irq = irqn;
 
+	if (of_property_read_bool(sgm->dev->of_node, "charger-wakeup-source")) {
+		wakeup_irq = of_irq_get(sgm->dev->of_node, 0);
+		if (wakeup_irq < 0)
+			return -EINVAL;
+		dev_pm_set_dedicated_wake_irq_spacemit(sgm->dev, wakeup_irq, IRQ_TYPE_EDGE_RISING);
+		device_init_wakeup(sgm->dev, true);
+	}
 	chg_en_gpio = of_get_named_gpio(sgm->dev->of_node, "sgm,chg-en-gpio", 0);
 	if (!gpio_is_valid(chg_en_gpio))
 	{
