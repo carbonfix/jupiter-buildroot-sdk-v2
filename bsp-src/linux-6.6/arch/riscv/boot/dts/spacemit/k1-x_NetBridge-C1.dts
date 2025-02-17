@@ -13,7 +13,7 @@
 #include "k1-x_thermal_cooling.dtsi"
 
 / {
-	model = "spacemit k1-x NetBridge board";
+	model = "spacemit k1-x NetBridge-C1 board";
 
 	cpus: cpus {
 		#address-cells = <1>;
