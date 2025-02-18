@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright(c) 2019 Realtek Corporation.
+ * Copyright(c) 2019 - 2023 Realtek Corporation.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -34,6 +34,18 @@ void phl_wow_mdl_deinit(struct phl_info_t* phl_info)
 	struct phl_wow_info *info = phl_to_wow_info(phl_info);
 
 	_os_spinlock_free(phl_to_drvpriv(phl_info), &info->wow_lock);
+#endif /* CONFIG_WOWLAN */
+}
+
+u32 rtw_phl_get_wow_fail_stat(void *phl)
+{
+#ifdef CONFIG_WOWLAN
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	struct phl_wow_info *wow_info = phl_to_wow_info(phl_info);
+
+	return (wow_info->wow_stat.err.init | wow_info->wow_stat.err.deinit);
+#else
+	return 0;
 #endif /* CONFIG_WOWLAN */
 }
 
@@ -132,6 +144,34 @@ _phl_cfg_pkt_ofld_probe_req_info(struct phl_wow_info *wow_info,
 		probe_req_info->construct_pbreq = wow_info->nlo_info.construct_pbreq;
 	}
 }
+
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+static void _phl_cfg_pkt_ofld_mdns_rsp_ipv4_info(struct phl_wow_info *wow_info, struct rtw_phl_stainfo_t *phl_sta,
+						struct rtw_mdns_ipv4_header *mdns_ipv4_hdr)
+{
+	void *drv_priv = phl_to_drvpriv(wow_info->phl_info);
+	u8 pairwise_algo = get_wow_pairwise_algo_type(wow_info);
+	struct dev_cap_t *dev_cap = &(wow_info->phl_info->phl_com->dev_cap);
+
+	mdns_ipv4_hdr->protect_bit = (pairwise_algo == RTW_ENC_NONE) ? false : true;
+
+	if (mdns_ipv4_hdr->protect_bit)
+		mdns_ipv4_hdr->sec_hdr_len = (_phl_chk_hw_form_sechdr(dev_cap, pairwise_algo)) ? 0 : _phl_query_iv_len(pairwise_algo);
+}
+
+static void _phl_cfg_pkt_ofld_mdns_rsp_ipv6_info(struct phl_wow_info *wow_info, struct rtw_phl_stainfo_t *phl_sta,
+						struct rtw_mdns_ipv6_header *mdns_ipv6_hdr)
+{
+	void *drv_priv = phl_to_drvpriv(wow_info->phl_info);
+	u8 pairwise_algo = get_wow_pairwise_algo_type(wow_info);
+	struct dev_cap_t *dev_cap = &(wow_info->phl_info->phl_com->dev_cap);
+
+	mdns_ipv6_hdr->protect_bit = (pairwise_algo == RTW_ENC_NONE) ? false : true;
+
+	if (mdns_ipv6_hdr->protect_bit)
+		mdns_ipv6_hdr->sec_hdr_len = (_phl_chk_hw_form_sechdr(dev_cap, pairwise_algo)) ? 0 : _phl_query_iv_len(pairwise_algo);
+}
+#endif /* CONFIG_PHL_MDNS_OFFLOAD */
 
 static void _phl_cfg_pkt_ofld_arp_rsp_info(struct phl_wow_info *wow_info, struct rtw_phl_stainfo_t *phl_sta,
 						struct rtw_pkt_ofld_arp_rsp_info *arp_rsp_info)
@@ -328,6 +368,10 @@ _phl_show_nlo_info(struct rtw_nlo_info *info)
 	if (info->num_of_networks == 0)
 		return;
 
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_,
+		  "[wow][nlo] compare_cipher_type = %u \n",
+		  info->compare_cipher_type);
+
 	for (i = 0; i < info->num_of_networks; i++) {
 
 		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_,
@@ -366,6 +410,7 @@ void rtw_phl_cfg_nlo_info(void *phl, struct rtw_nlo_info *info)
 		info->ssidlen, info->num_of_networks);
 	_os_mem_cpy(drv_priv, nlo_info->chipertype,
 		info->chipertype, info->num_of_networks);
+	nlo_info->compare_cipher_type = info->compare_cipher_type;
 	nlo_info->num_of_hidden_ap = info->num_of_hidden_ap;
 	nlo_info->channel_num = info->channel_num;
 	_os_mem_cpy(drv_priv, nlo_info->channel_list, info->channel_list,
@@ -392,6 +437,49 @@ void rtw_phl_cfg_periodic_wake_info(void *phl,
 	_os_mem_cpy(drv_priv, pw_info, info,
 		    sizeof(struct rtw_periodic_wake_info));
 }
+
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+void rtw_phl_cfg_mdns_ofld_info(void *phl, struct rtw_mdns_ofld_info *info)
+{
+	struct phl_info_t *phl_info = (struct phl_info_t *)phl;
+	struct phl_wow_info *wow_info = phl_to_wow_info(phl_info);
+	void *drv_priv = phl_to_drvpriv(phl_info);
+
+	FUNCIN();
+
+	wow_info->mdns_ofld_info = info;
+
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] mdns_en %u\n",
+			wow_info->mdns_ofld_info->mdns_en);
+
+	if (!is_all_null(wow_info->mdns_ofld_info->mdns_ipv4_header.src_ipv4_addr, RTW_IP_ADDR_LEN))
+		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] src_ipv4_addr  %u:%u:%u:%u\n",
+		          wow_info->mdns_ofld_info->mdns_ipv4_header.src_ipv4_addr[0],
+		          wow_info->mdns_ofld_info->mdns_ipv4_header.src_ipv4_addr[1],
+		          wow_info->mdns_ofld_info->mdns_ipv4_header.src_ipv4_addr[2],
+		          wow_info->mdns_ofld_info->mdns_ipv4_header.src_ipv4_addr[3]);
+	if (!is_all_null(wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr, RTW_IPv6_ADDR_LEN))
+		PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_,
+		          "[wow] src_ipv6_addr %02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x\n",
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[0],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[1],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[2],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[3],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[4],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[5],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[6],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[7],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[8],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[9],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[10],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[11],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[12],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[13],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[14],
+		          wow_info->mdns_ofld_info->mdns_ipv6_header.src_ipv6_addr[15]);
+
+}
+#endif
 
 void rtw_phl_cfg_arp_ofld_info(void *phl, struct rtw_arp_ofld_info *info)
 {
@@ -1012,45 +1100,45 @@ void phl_record_wow_stat(struct phl_wow_info *wow_info)
 		++wow_stat->aoac_rpt_fail_cnt;
 }
 
-#ifdef CONFIG_PCI_HCI
 enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
 {
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
 	u8 status = false;
 
-	do {
-		/* 1. stop Tx DMA */
-		rtw_hal_wow_cfg_txdma(phl_info->hal, false);
+	/* 1. config Tx DMA */
+	rtw_hal_wow_cfg_txdma(phl_info->hal, RTW_MAC_CTRL_TXDMA_H2C2H_ONLY);
 
-		/* 2. stop HW Tx */
-		hstatus = rtw_hal_wow_drop_tx(phl_info->hal, band);
-		if (RTW_HAL_STATUS_SUCCESS != hstatus) {
-			PHL_ERR("[wow] rtw_hal_wow_drop_tx fail!\n");
-			break;
-		}
+	/* 2. stop HW Tx */
+	hstatus = rtw_hal_wow_drop_tx(phl_info->hal, band);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+		PHL_ERR("[wow] rtw_hal_wow_drop_tx fail!\n");
+		goto exit;
+	}
 
-		/* 3. poll dma idle */
-		status = rtw_hal_poll_txdma_idle(phl_info->hal);
-		if (!status) {
-			PHL_ERR("[wow] rtw_hal_poll_txdma_idle fail!\n");
-			break;
-		}
+	/* 3. poll dma idle */
+	status = rtw_hal_poll_txdma_idle(phl_info->hal);
+	if (!status) {
+		PHL_ERR("[wow] rtw_hal_poll_txdma_idle fail!\n");
+		goto exit;
+	}
 
-	} while (0);
+	pstatus = RTW_PHL_STATUS_SUCCESS;
 
-	if (RTW_HAL_STATUS_SUCCESS != hstatus)
-		pstatus = RTW_PHL_STATUS_FAILURE;
-	else
-		pstatus = RTW_PHL_STATUS_SUCCESS;
-
+exit:
 	FUNCOUT_WSTS(pstatus);
 
 	return pstatus;
 }
+
 enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
 {
-	/* stop tx/rx hci */
+	struct phl_hci_trx_ops *trx_ops = phl_info->hci_trx_ops;
+
+	/* stop driver tx/rx hci */
+	trx_ops->trx_stop(phl_info);
+
+	/* stop mac tx/rx hci */
 	rtw_hal_cfg_txhci(phl_info->hal, false);
 	rtw_hal_cfg_rxhci(phl_info->hal, false);
 
@@ -1058,30 +1146,6 @@ enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
-#elif defined(CONFIG_USB_HCI)
-enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
-{
-	struct phl_hci_trx_ops *trx_ops = phl_info->hci_trx_ops;
-
-	trx_ops->trx_stop(phl_info);
-
-	return RTW_PHL_STATUS_SUCCESS;
-}
-#elif defined(CONFIG_SDIO_HCI)
-enum rtw_phl_status _init_precfg(struct phl_info_t *phl_info, u8 band)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-enum rtw_phl_status _init_postcfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-
-#endif
 
 static enum rtw_phl_status _init_precfg_set_rxfltr(struct phl_info_t *phl_info)
 {
@@ -1109,7 +1173,6 @@ static void _wow_start_datapath(struct phl_info_t *phl_info, u8 type)
 
 	if (type & PHL_CTRL_TX) {
 		trx_ops->trx_resume(phl_info, PHL_CTRL_TX);
-		rtw_phl_tx_req_notify(phl_info);
 	}
 
 	if (type & PHL_CTRL_RX) {
@@ -1168,9 +1231,108 @@ static void _wow_stop_datapath(struct phl_info_t *phl_info, u8 type)
 	}
 }
 
+enum rtw_phl_status
+phl_set_wowlan(struct phl_info_t *phl_info, u8 enter, bool disable_inband)
+{
+	enum mac_ax_wow_ctrl wow_ctrl;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
+
+	if (enter == true) {
+		/* if disable_inband is true, only outband wakeup is set */
+		if (disable_inband)
+			wow_ctrl = MAC_AX_WOW_ENTER_OUTBAND_WAKEUP;
+		else
+			wow_ctrl = MAC_AX_WOW_ENTER;
+
+#ifdef RTW_WKARD_DYNAMIC_PCIE_GEN
+		rtw_hal_pcie_gen_set(phl_info->hal, RTW_PCIE_GEN_2);
+#endif
+	} else {
+		wow_ctrl = MAC_AX_WOW_LEAVE;
+	}
+
+	hstatus = rtw_hal_set_wowlan(phl_info->phl_com, phl_info->hal, wow_ctrl);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus) {
+		PHL_WARN("[wow] rtw_hal_set_wowlan failed, status(%u)\n", hstatus);
+		return RTW_PHL_STATUS_FAILURE;
+	} else {
+		return RTW_PHL_STATUS_SUCCESS;
+	}
+}
+
+struct _set_wowlan_param {
+	u8 enter;
+	u8 disable_inband;
+};
+
+static void
+_cmd_set_wowlan_done(void *drv_priv, u8 *cmd, u32 cmd_len,
+                     enum rtw_phl_status status)
+{
+	if (cmd) {
+		_os_kmem_free(drv_priv, cmd, cmd_len);
+		cmd = NULL;
+		PHL_INFO("%s.....\n", __func__);
+	}
+}
+
+enum rtw_phl_status
+phl_cmd_set_wowlan_hdl(struct phl_info_t *phl_info, u8 *param)
+{
+	struct _set_wowlan_param *set_param = NULL;
+
+	if (!param)
+		return RTW_PHL_STATUS_FAILURE;
+
+	set_param = (struct _set_wowlan_param *)param;
+
+	return phl_set_wowlan(phl_info, set_param->enter, set_param->disable_inband);
+}
+
+enum rtw_phl_status
+phl_cmd_set_wowlan(struct phl_wow_info *wow_info, u8 enter, bool direct)
+{
+	struct phl_info_t *phl_info = wow_info->phl_info;
+	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
+	struct _set_wowlan_param *param = NULL;
+	u32 param_len = 0;
+
+	if (direct)
+		return phl_set_wowlan(phl_info, enter,
+		                      (u8)wow_info->wow_gpio.d2h_gpio_info.disable_inband);
+
+	param_len = sizeof(struct _set_wowlan_param);
+	param = _os_kmem_alloc(phl_to_drvpriv(phl_info), param_len);
+	if (param == NULL) {
+		PHL_ERR("%s: alloc param failed!\n", __func__);
+		return pstatus;
+	}
+	param->enter = enter;
+	param->disable_inband = (u8)wow_info->wow_gpio.d2h_gpio_info.disable_inband;
+	pstatus = phl_cmd_enqueue(phl_info,
+				  HW_BAND_0,
+				  MSG_EVT_HAL_SET_WOWLAN,
+				  (u8 *)param,
+				  param_len,
+				  _cmd_set_wowlan_done,
+				  PHL_CMD_WAIT,
+				  0);
+	if (is_cmd_failure(pstatus)) {
+		/* Send cmd success, but wait cmd fail*/
+		pstatus = RTW_PHL_STATUS_FAILURE;
+	} else if (pstatus != RTW_PHL_STATUS_SUCCESS) {
+		/* Send cmd fail */
+		_os_kmem_free(phl_to_drvpriv(phl_info), param, param_len);
+		pstatus = RTW_PHL_STATUS_FAILURE;
+	}
+
+	return pstatus;
+}
+
 enum rtw_phl_status phl_wow_init_precfg(struct phl_wow_info *wow_info)
 {
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_SUCCESS;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	struct phl_info_t *phl_info = wow_info->phl_info;
 	struct rtw_wifi_role_t *wrole = wow_info->sta->wrole;
 	struct rtw_wifi_role_link_t *rlink = NULL;
@@ -1196,7 +1358,9 @@ enum rtw_phl_status phl_wow_init_precfg(struct phl_wow_info *wow_info)
 	for (idx = 0; idx < wrole->rlink_num; idx++) {
 		rlink = get_rlink(wrole, idx);
 
-		rtw_hal_ppdu_sts_cfg(phl_info->hal, rlink->hw_band, false);
+		hstatus = rtw_hal_ppdu_sts_cfg(phl_info->hal, rlink->hw_band, false);
+		if (RTW_HAL_STATUS_SUCCESS != hstatus)
+			SET_WOW_INIT_ERR(wow_info, WOW_PPDU_STS_CFG);
 	}
 
 	pstatus = RTW_PHL_STATUS_SUCCESS;
@@ -1296,10 +1460,10 @@ static void _phl_indic_wake_sec_upd(struct phl_wow_info *wow_info, u8 aoac_repor
 			, __func__);
 }
 
-static void _phl_handle_aoac_rpt_action(struct phl_wow_info *wow_info, bool rx_ready)
+static enum rtw_hal_status _phl_handle_aoac_rpt_action(struct phl_wow_info *wow_info, bool rx_ready)
 {
 	struct phl_info_t *phl_info = wow_info->phl_info;
-	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	u8 aoac_report_get_ok = false;
 	static u8 phase_0_ok = false;
 
@@ -1326,6 +1490,8 @@ static void _phl_handle_aoac_rpt_action(struct phl_wow_info *wow_info, bool rx_r
 			wow_info->aoac_info.rpt_fail = (aoac_report_get_ok == false) ? true : false;
 		}
 	}
+
+	return hstatus;
 }
 
 static enum rtw_phl_status _phl_indic_wake_rsn(struct phl_wow_info *wow_info)
@@ -1376,71 +1542,57 @@ phl_get_wow_excld_susp_role_map(struct phl_info_t *phl_i)
 void phl_wow_handle_wake_rsn(struct phl_wow_info *wow_info, u8 *reset)
 {
 	struct phl_info_t *phl_info = wow_info->phl_info;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 
-	rtw_hal_get_wake_rsn(phl_info->hal, &wow_info->wake_rsn, reset);
+	hstatus = rtw_hal_get_wake_rsn(phl_info->hal, &wow_info->wake_rsn, reset);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus)
+		SET_WOW_DEINIT_ERR(wow_info, WOW_HANDLE_WAKE_RSN);
 	_phl_indic_wake_rsn(wow_info);
 }
 
-#ifdef CONFIG_PCI_HCI
 enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
 {
-#ifdef DBG_RST_BDRAM_TIME
-	u32 rst_bdram_start = _os_get_cur_time_ms();
-#endif /* DBG_RST_BDRAM_TIME */
+	struct phl_hci_trx_ops *trx_ops = phl_info->hci_trx_ops;
 
-	rtw_hal_clear_bdidx(phl_info->hal);
-
-#ifdef DBG_RST_BDRAM_TIME
-	rst_bdram_start = _os_get_cur_time_ms();
-#endif
-	rtw_hal_rst_bdram(phl_info->hal);
-
-#ifdef DBG_RST_BDRAM_TIME
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : Reset bdram takes %u (ms).\n"
-		, __func__, phl_get_passing_time_ms(rst_bdram_start));
-#endif
+	rtw_hal_clear_rwptr(phl_info->hal);
 
 	rtw_hal_cfg_txhci(phl_info->hal, true);
 	rtw_hal_cfg_rxhci(phl_info->hal, true);
 
-	rtw_hal_wow_cfg_txdma(phl_info->hal, true);
-
-	return RTW_PHL_STATUS_SUCCESS;
-}
-#elif defined(CONFIG_USB_HCI)
-enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
-{
-	struct phl_hci_trx_ops *trx_ops = phl_info->hci_trx_ops;
+	rtw_hal_wow_cfg_txdma(phl_info->hal, RTW_MAC_CTRL_TXDMA_EN_ALL);
 
 	trx_ops->trx_cfg(phl_info);
 
 	return RTW_PHL_STATUS_SUCCESS;
 }
-#elif defined(CONFIG_SDIO_HCI)
-enum rtw_phl_status _deinit_precfg(struct phl_info_t *phl_info)
-{
-	return RTW_PHL_STATUS_SUCCESS;
-}
-#endif
 
 enum rtw_phl_status phl_wow_deinit_precfg(struct phl_wow_info *wow_info)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_SUCCESS;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	struct phl_info_t *phl_info = wow_info->phl_info;
 
 	_deinit_precfg(phl_info);
 
-	rtw_hal_cfg_wow_sleep(phl_info->hal, false);
+	hstatus = rtw_hal_cfg_wow_sleep(phl_info->hal, false);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus)
+		SET_WOW_DEINIT_ERR(wow_info, WOW_CFG_WOW_SLEEP);
 
 	_phl_get_nlo_rpt(wow_info);
 
-	_phl_handle_aoac_rpt_action(wow_info, false);
+	hstatus = _phl_handle_aoac_rpt_action(wow_info, false);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus)
+		SET_WOW_DEINIT_ERR(wow_info, WOW_HANDLE_AOAC_RPT_PHASE0);
 
 	_wow_start_datapath(phl_info, PHL_CTRL_RX);
 
 	_wow_initialize_interrupt(phl_info);
 
-	_phl_handle_aoac_rpt_action(wow_info, true);
+	hstatus = _phl_handle_aoac_rpt_action(wow_info, true);
+	if (RTW_HAL_STATUS_SUCCESS != hstatus)
+		SET_WOW_DEINIT_ERR(wow_info, WOW_HANDLE_AOAC_RPT_PHASE1);
+
+	rtw_hal_wow_req_diag_rpt(phl_info->hal);
 
 	return phl_status;
 }
@@ -1476,6 +1628,7 @@ void phl_reset_wow_info(struct phl_wow_info *wow_info)
 enum rtw_phl_status phl_wow_deinit_postcfg(struct phl_wow_info *wow_info)
 {
 	enum rtw_phl_status phl_status = RTW_PHL_STATUS_SUCCESS;
+	enum rtw_hal_status hstatus = RTW_HAL_STATUS_SUCCESS;
 	struct phl_info_t *phl_info = wow_info->phl_info;
 	struct rtw_wifi_role_t *wrole = wow_info->sta->wrole;
 	struct rtw_wifi_role_link_t *rlink = NULL;
@@ -1486,16 +1639,20 @@ enum rtw_phl_status phl_wow_deinit_postcfg(struct phl_wow_info *wow_info)
 	/* enable ppdu sts */
 	for (idx = 0; idx < wrole->rlink_num; idx++) {
 		rlink = get_rlink(wrole, idx);
-		rtw_hal_ppdu_sts_cfg(phl_info->hal, rlink->hw_band, true);
+		hstatus = rtw_hal_ppdu_sts_cfg(phl_info->hal, rlink->hw_band, true);
+		if (RTW_HAL_STATUS_SUCCESS != hstatus)
+			SET_WOW_DEINIT_ERR(wow_info, WOW_PPDU_STS_CFG);
 	}
 
 	return phl_status;
 }
 
-enum rtw_phl_status _phl_wow_cfg_pkt_ofld(struct phl_wow_info *wow_info, u8 pkt_type, u8 *pkt_id, void *buf)
+enum rtw_phl_status _phl_wow_cfg_pkt_ofld(struct phl_wow_info *wow_info, u8 pkt_type, u8 *pkt_id, void *buf, u8 ofld_idx)
 {
 	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
+#ifdef CONFIG_PHL_PKTOFLD
 	u16 macid = wow_info->sta->macid;
+#endif
 	u32 *token;
 
 	switch(pkt_type) {
@@ -1526,20 +1683,35 @@ enum rtw_phl_status _phl_wow_cfg_pkt_ofld(struct phl_wow_info *wow_info, u8 pkt_
 	case PKT_TYPE_PROBE_REQ:
 		token = &wow_info->probe_req_pkt_token;
 		break;
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+	case PKT_TYPE_MDNS_RSP_IPV4:
+		token = &wow_info->mdns_rsp_ipv4_token;
+		break;
+	case PKT_TYPE_MDNS_RSP_IPV6:
+		token = &wow_info->mdns_rsp_ipv6_token;
+		break;
+	case PKT_TYPE_MDNS_RSP_DATA:
+		token = &wow_info->mdns_rsp_data_token[ofld_idx];
+		break;
+	case PKT_TYPE_MDNS_PASSTHRU_LIST:
+		token = &wow_info->mdns_passthru_list_token[ofld_idx];
+		break;
+#endif
 	default:
 		PHL_TRACE(COMP_PHL_WOW, _PHL_ERR_, "[wow] %s : unknown pkt_type %d.\n"
 			, __func__, pkt_type);
 		return pstatus;
 	}
 
-	pstatus = rtw_phl_pkt_ofld_request(wow_info->phl_info, macid, pkt_type, token, buf, __func__);
+#ifdef CONFIG_PHL_PKTOFLD
+	pstatus = rtw_phl_pkt_ofld_request(wow_info->phl_info, macid, pkt_type, token, buf, __func__, ofld_idx);
 
 	if (pstatus == RTW_PHL_STATUS_SUCCESS)
-		*pkt_id = phl_pkt_ofld_get_id(wow_info->phl_info, macid, pkt_type);
+		*pkt_id = phl_pkt_ofld_get_id(wow_info->phl_info, macid, pkt_type, ofld_idx);
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : pkt_type %s, pkt_id %d, token %u, status(%u)\n",
 		__func__, phl_get_pkt_ofld_str(pkt_type), *pkt_id, *token, pstatus);
-
+#endif
 	return pstatus;
 }
 
@@ -1599,6 +1771,15 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 	struct rtw_pkt_ofld_realwow_wp_info wakeup_info = {0};
 	struct rtw_pkt_ofld_probe_req_info probe_req_info = {0};
 	struct rtw_hal_wow_cfg cfg;
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+	struct rtw_mdns_ofld_info *mdns_ofld_info = wow_info->mdns_ofld_info;
+	struct rtw_mdns_ipv4_header *mdns_ipv4_header = &mdns_ofld_info->mdns_ipv4_header;
+	struct rtw_mdns_ipv6_header *mdns_ipv6_header = &mdns_ofld_info->mdns_ipv6_header;
+	struct rtw_mdns_resp_entry *resp_entry = mdns_ofld_info->resp_entry;
+	struct rtw_mdns_passthru_name *passthru_name = mdns_ofld_info->passthru_list.passthru_name;
+	u8 resp_offset = 0;
+#endif
+	u8 ofld_idx;
 
 	FUNCIN();
 
@@ -1614,7 +1795,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_ARP_RSP,
 					&wow_info->arp_ofld_info.arp_rsp_id,
-					(void *)&arp_rsp_info);
+					(void *)&arp_rsp_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1629,7 +1810,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 				pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 						PKT_TYPE_NULL_DATA,
 						&wow_info->keep_alive_info.keep_alive_pkt_id,
-						(void *)&null_info);
+						(void *)&null_info, 0);
 
 				if (pstatus != RTW_PHL_STATUS_SUCCESS)
 					break;
@@ -1647,7 +1828,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_NDP, &wow_info->ndp_ofld_info.ndp_id,
-					(void *)&na_info);
+					(void *)&na_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1658,7 +1839,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_EAPOL_KEY, &wow_info->gtk_ofld_info.gtk_rsp_id,
-					(void *)&eapol_key_info);
+					(void *)&eapol_key_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1668,7 +1849,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 
 				pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_SA_QUERY, &wow_info->gtk_ofld_info.sa_query_id,
-					(void *)&sa_query_info);
+					(void *)&sa_query_info, 0);
 
 				if (pstatus != RTW_PHL_STATUS_SUCCESS)
 					break;
@@ -1683,7 +1864,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_REALWOW_KAPKT,
 					&wow_info->realwow_info.keepalive_id,
-					(void *)&kapkt_info);
+					(void *)&kapkt_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1694,7 +1875,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_REALWOW_ACK,
 					&wow_info->realwow_info.ack_pattern_id,
-					(void *)&ack_info);
+					(void *)&ack_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1705,7 +1886,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 					PKT_TYPE_REALWOW_WP,
 					&wow_info->realwow_info.wakeup_pattern_id,
-					(void *)&wakeup_info);
+					(void *)&wakeup_info, 0);
 
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
@@ -1718,7 +1899,7 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
 			                                PKT_TYPE_PROBE_REQ,
 			                                &wow_info->nlo_info.probe_req_id,
-			                                (void *)&probe_req_info);
+			                                (void *)&probe_req_info, 0);
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
 
@@ -1726,6 +1907,70 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			if (pstatus != RTW_PHL_STATUS_SUCCESS)
 				break;
 		}
+
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+		if (wow_info->mdns_ofld_info->mdns_en) {
+			/* mdns data response */
+			for (ofld_idx = 0; ofld_idx < MAX_MDNS_RESP_NUM; ofld_idx++) {
+				set_wow_init_pkt_ofld_id(&resp_entry[ofld_idx].data_pktid);
+				if (resp_entry[ofld_idx].content_len) {
+					resp_offset = resp_offset | BIT(ofld_idx);
+					pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
+					          PKT_TYPE_MDNS_RSP_DATA,
+					          &resp_entry[ofld_idx].data_pktid,
+					          (void *)&resp_entry[ofld_idx],
+					          ofld_idx);
+					if (pstatus != RTW_PHL_STATUS_SUCCESS)
+						goto exit;
+				}
+			}
+
+			/* ipv4 header */
+			set_wow_init_pkt_ofld_id(&mdns_ipv4_header->ipv4_pktid);
+			if (!is_all_null(mdns_ipv4_header->src_ipv4_addr, RTW_IP_ADDR_LEN)
+			                 && resp_offset) {
+				_phl_cfg_pkt_ofld_mdns_rsp_ipv4_info(wow_info, sta, mdns_ipv4_header);
+
+				pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
+				          PKT_TYPE_MDNS_RSP_IPV4,
+				          &mdns_ipv4_header->ipv4_pktid,
+				          (void *)mdns_ipv4_header, 0);
+
+				if (pstatus != RTW_PHL_STATUS_SUCCESS)
+					break;
+			}
+
+			/* ipv6 header */
+			set_wow_init_pkt_ofld_id(&mdns_ipv6_header->ipv6_pktid);
+			if (!is_all_null(mdns_ipv6_header->src_ipv6_addr, RTW_IPv6_ADDR_LEN)
+			                 && resp_offset) {
+				_phl_cfg_pkt_ofld_mdns_rsp_ipv6_info(wow_info, sta, mdns_ipv6_header);
+
+				pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
+				          PKT_TYPE_MDNS_RSP_IPV6,
+				          &mdns_ipv6_header->ipv6_pktid,
+				          (void *)mdns_ipv6_header, 0);
+
+				if (pstatus != RTW_PHL_STATUS_SUCCESS)
+					break;
+			}
+
+
+			/* mdns passthru list */
+			for (ofld_idx = 0; ofld_idx < MAX_MDNS_PASSTHRU_NAME_NUM; ofld_idx++) {
+				set_wow_init_pkt_ofld_id(&passthru_name[ofld_idx].pass_pktid);
+				if (passthru_name[ofld_idx].name_len) {
+					pstatus = _phl_wow_cfg_pkt_ofld(wow_info,
+					          PKT_TYPE_MDNS_PASSTHRU_LIST,
+					          &passthru_name[ofld_idx].pass_pktid,
+					          (void *)&passthru_name[ofld_idx],
+					          ofld_idx);
+					if (pstatus != RTW_PHL_STATUS_SUCCESS)
+						goto exit;
+				}
+			}
+		}
+#endif /* CONFIG_PHL_MDNS_OFFLOAD */
 
 		cfg.keep_alive_cfg = &wow_info->keep_alive_info;
 		cfg.disc_det_cfg = &wow_info->disc_det_info;
@@ -1738,6 +1983,9 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 		cfg.pattern_match_info = &wow_info->pattern_match_info;
 		cfg.wow_gpio = &wow_info->wow_gpio;
 		cfg.periodic_wake_cfg = &wow_info->periodic_wake_info;
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+		cfg.mdns_ofld_info = wow_info->mdns_ofld_info;
+#endif
 
 		hstatus = rtw_hal_wow_func_en(phl_info->phl_com, phl_info->hal, sta->macid, &cfg);
 		if (hstatus != RTW_HAL_STATUS_SUCCESS) {
@@ -1746,8 +1994,14 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 			break;
 		}
 
+		hstatus = rtw_hal_wow_req_tri_evt(phl_info->hal);
+		if (hstatus != RTW_HAL_STATUS_SUCCESS) {
+			PHL_ERR("rtw_hal_req_wow_tri_evt fail, status (%u)\n", hstatus);
+		}
+
 		hstatus = rtw_hal_wow_func_start(phl_info->phl_com, phl_info->hal, sta->macid, &cfg);
 		if (hstatus != RTW_HAL_STATUS_SUCCESS) {
+			SET_WOW_INIT_ERR(wow_info, WOW_FUNC_START);
 			PHL_ERR("rtw_hal_wow_func_start fail, status (%u)\n", hstatus);
 			pstatus = RTW_PHL_STATUS_FAILURE;
 			break;
@@ -1758,22 +2012,32 @@ enum rtw_phl_status phl_wow_func_en(struct phl_wow_info *wow_info)
 
 	} while (0);
 
+exit:
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s status (%u).\n", __func__, pstatus);
 
 	return pstatus;
 }
 
-void phl_wow_func_dis(struct phl_wow_info *wow_info)
+enum rtw_phl_status phl_wow_func_dis(struct phl_wow_info *wow_info)
 {
-	enum rtw_phl_status pstatus = RTW_PHL_STATUS_FAILURE;
+	enum rtw_phl_status pstatus = RTW_PHL_STATUS_SUCCESS;
 	enum rtw_hal_status hstatus = RTW_HAL_STATUS_FAILURE;
 	struct phl_info_t *phl_info = wow_info->phl_info;
 	struct rtw_phl_stainfo_t *sta = wow_info->sta;
 	struct rtw_hal_wow_cfg cfg;
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+	struct rtw_mdns_ofld_info *mdns_ofld_info = wow_info->mdns_ofld_info;
+	struct rtw_mdns_ipv4_header *mdns_ipv4_header = &mdns_ofld_info->mdns_ipv4_header;
+	struct rtw_mdns_ipv6_header *mdns_ipv6_header = &mdns_ofld_info->mdns_ipv6_header;
+	struct rtw_mdns_resp_entry *resp_entry = mdns_ofld_info->resp_entry;
+	struct rtw_mdns_passthru_name *passthru_name = mdns_ofld_info->passthru_list.passthru_name;
+	u8 resp_offset = 0;
+#endif
+	u8 ofld_idx;
 
 	if (!wow_info->wow_wake_info.wow_en) {
 		PHL_WARN("%s : wow func is not enabled!\n", __func__);
-		return;
+		return RTW_PHL_STATUS_SUCCESS;
 	}
 
 	cfg.keep_alive_cfg = &wow_info->keep_alive_info;
@@ -1787,6 +2051,9 @@ void phl_wow_func_dis(struct phl_wow_info *wow_info)
 	cfg.pattern_match_info = &wow_info->pattern_match_info;
 	cfg.wow_gpio = &wow_info->wow_gpio;
 	cfg.periodic_wake_cfg = &wow_info->periodic_wake_info;
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+	cfg.mdns_ofld_info = wow_info->mdns_ofld_info;
+#endif
 
 	hstatus = rtw_hal_wow_func_dis(phl_info->phl_com, phl_info->hal, sta->macid,
 	                               &cfg);
@@ -1794,88 +2061,127 @@ void phl_wow_func_dis(struct phl_wow_info *wow_info)
 		PHL_ERR("rtw_hal_wow_func_dis fail, status (%u)\n", hstatus);
 
 	if (wow_info->arp_ofld_info.arp_en) {
+#ifdef CONFIG_PHL_PKTOFLD
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-							PKT_TYPE_ARP_RSP, &wow_info->arp_pkt_token);
+		                        PKT_TYPE_ARP_RSP, &wow_info->arp_pkt_token, 0);
+#endif
 	}
 
 	if (wow_info->keep_alive_info.keep_alive_en &&
 	    wow_info->keep_alive_info.keep_alive_pkt_type == PKT_TYPE_NULL_DATA) {
+#ifdef CONFIG_PHL_PKTOFLD
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-							PKT_TYPE_NULL_DATA, &wow_info->null_pkt_token);
+		                        PKT_TYPE_NULL_DATA, &wow_info->null_pkt_token, 0);
 	}
+#endif
 
 	if (wow_info->ndp_ofld_info.ndp_en) {
+#ifdef CONFIG_PHL_PKTOFLD
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-							PKT_TYPE_NDP, &wow_info->ndp_pkt_token);
+		                        PKT_TYPE_NDP, &wow_info->ndp_pkt_token, 0);
+#endif
 	}
 
 	if (wow_info->gtk_ofld_info.gtk_en) {
+#ifdef CONFIG_PHL_PKTOFLD
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-							PKT_TYPE_EAPOL_KEY, &wow_info->eapol_key_pkt_token);
+		                        PKT_TYPE_EAPOL_KEY,
+		                        &wow_info->eapol_key_pkt_token, 0);
+#endif
 		if (wow_info->gtk_ofld_info.ieee80211w_en) {
+#ifdef CONFIG_PHL_PKTOFLD
 			rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-								PKT_TYPE_SA_QUERY, &wow_info->sa_query_pkt_token);
+			                        PKT_TYPE_SA_QUERY,
+			                        &wow_info->sa_query_pkt_token, 0);
+#endif
 		}
 	}
 
 	if (wow_info->realwow_info.realwow_en) {
+#ifdef CONFIG_PHL_PKTOFLD
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-					PKT_TYPE_REALWOW_KAPKT, &wow_info->kapkt_pkt_token);
+					PKT_TYPE_REALWOW_KAPKT, &wow_info->kapkt_pkt_token, 0);
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-					PKT_TYPE_REALWOW_ACK, &wow_info->ack_pkt_token);
+					PKT_TYPE_REALWOW_ACK, &wow_info->ack_pkt_token, 0);
 		rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
-					PKT_TYPE_REALWOW_WP, &wow_info->wp_token);
+					PKT_TYPE_REALWOW_WP, &wow_info->wp_token, 0);
+#endif
 	}
 
 	if (wow_info->nlo_info.nlo_en) {
-
+#ifdef CONFIG_PHL_PKTOFLD
 		pstatus = rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
 		                              PKT_TYPE_PROBE_REQ,
-		                              &wow_info->probe_req_pkt_token);
-
+		                              &wow_info->probe_req_pkt_token, 0);
+#endif
 		hstatus = rtw_hal_wow_cfg_nlo(phl_info->hal, SCAN_OFLD_OP_STOP,
 		                              sta->macid, sta->rlink->hw_band,
 		                              sta->rlink->hw_port,
 		                              &wow_info->nlo_info);
 	}
 
+#ifdef CONFIG_PHL_MDNS_OFFLOAD
+	if (mdns_ofld_info->mdns_en) {
+		/* mdns data response */
+		for (ofld_idx = 0; ofld_idx < MAX_MDNS_RESP_NUM; ofld_idx++) {
+			if (resp_entry[ofld_idx].content_len) {
+				resp_offset = resp_offset | BIT(ofld_idx);
+				rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
+							PKT_TYPE_MDNS_RSP_DATA,
+							&wow_info->mdns_rsp_data_token[ofld_idx],
+							ofld_idx);
+			}
+		}
+		/* ipv4 header */
+		if (!is_all_null(mdns_ipv4_header->src_ipv4_addr, RTW_IP_ADDR_LEN)
+		                 && resp_offset)
+			rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
+			            PKT_TYPE_MDNS_RSP_IPV4, &wow_info->mdns_rsp_ipv4_token, 0);
+		/* ipv6 header */
+		if (!is_all_null(mdns_ipv6_header->src_ipv6_addr, RTW_IPv6_ADDR_LEN)
+		                 && resp_offset)
+			rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
+			            PKT_TYPE_MDNS_RSP_IPV6, &wow_info->mdns_rsp_ipv6_token, 0);
+		/* mdns passthru list */
+		for (ofld_idx = 0; ofld_idx < MAX_MDNS_PASSTHRU_NAME_NUM; ofld_idx++) {
+			if (passthru_name[ofld_idx].name_len)
+				rtw_phl_pkt_ofld_cancel(phl_info, sta->macid,
+							PKT_TYPE_MDNS_PASSTHRU_LIST,
+							&wow_info->mdns_passthru_list_token[ofld_idx],
+							ofld_idx);
+		}
+	}
+#endif
+
 
 	hstatus = rtw_hal_wow_func_stop(phl_info->phl_com, phl_info->hal, sta->macid);
-	if (hstatus != RTW_HAL_STATUS_SUCCESS)
+	if (hstatus != RTW_HAL_STATUS_SUCCESS) {
+		SET_WOW_DEINIT_ERR(wow_info, WOW_FUNC_STOP);
 		PHL_ERR("rtw_hal_wow_func_stop fail, status (%u)\n", hstatus);
+		pstatus = RTW_PHL_STATUS_FAILURE;
+	}
 
 	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s done.\n", __func__);
+
+	return pstatus;
 }
 
 void phl_wow_decide_op_mode(struct phl_wow_info *wow_info,
                             struct rtw_phl_stainfo_t *sta)
 {
 	enum mlme_state mstat = sta->wrole->mstate;
-	struct rtw_ps_cap_t *ps_cap = _get_ps_cap(wow_info->phl_info);
 
 	wow_info->sta = sta;
-	wow_info->ps_pwr_lvl = PS_PWR_LVL_PWRON;
 
-	if (mstat == MLME_NO_LINK && wow_info->no_link_mode) {
+	if (mstat == MLME_NO_LINK && wow_info->no_link_mode)
 		wow_info->op_mode = RTW_WOW_OP_DISCONNECT_STBY;
-		#ifdef CONFIG_POWER_SAVE
-		if (ps_cap->ips_wow_en)
-			wow_info->ps_pwr_lvl = phl_ps_judge_pwr_lvl(ps_cap->ips_wow_cap,
-			                                            PS_MODE_IPS, true);
-		#endif
-	} else if (mstat == MLME_LINKED) {
+	else if (mstat == MLME_LINKED)
 		wow_info->op_mode = RTW_WOW_OP_CONNECT_STBY;
-		#ifdef CONFIG_POWER_SAVE
-		if (ps_cap->lps_wow_en)
-			wow_info->ps_pwr_lvl = phl_ps_judge_pwr_lvl(ps_cap->lps_wow_cap,
-			                                            PS_MODE_LPS, true);
-		#endif
-	} else {
+	else
 		wow_info->op_mode = RTW_WOW_OP_PWR_DOWN;
-	}
 
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s op mode set to %d, pwr lvl %s.\n.",
-			  __func__, wow_info->op_mode, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s op mode set to %d.\n.",
+			  __func__, wow_info->op_mode);
 }
 
 #ifdef CONFIG_POWER_SAVE
@@ -1911,11 +2217,13 @@ enum rtw_phl_status phl_wow_ps_proto_cfg(struct phl_wow_info *wow_info, bool ent
 
 		/* LPS */
 		if (ps_cap->lps_wow_en) {
+			cfg.wow = true;
 			cfg.macid = wow_info->sta->macid;
 			cfg.awake_interval = ps_cap->lps_wow_awake_interval;
 			cfg.listen_bcn_mode = ps_cap->lps_wow_listen_bcn_mode;
 			cfg.smart_ps_mode = ps_cap->lps_wow_smart_ps_mode;
 			cfg.bcnnohit_en = ps_cap->lps_wow_bcnnohit_en;
+			cfg.lps_force_tx = ps_cap->lps_force_tx;
 			pstatus = phl_ps_lps_cfg(phl_info, &cfg, enter_ps);
 		}
 	} else {
@@ -1923,10 +2231,36 @@ enum rtw_phl_status phl_wow_ps_proto_cfg(struct phl_wow_info *wow_info, bool ent
 	}
 
 exit:
-	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n.",
-			  __func__, wow_info->op_mode, enter_ps, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d.\n.",
+			  __func__, wow_info->op_mode, enter_ps);
 
 	return pstatus;
+}
+
+/**
+ * phl_wow_ps_judge_pwr_lvl - configure the power level under wowlan
+ * @wow_info: see struct phl_wow_info
+ * @enter_ps: enter low power or not
+ *
+ */
+void phl_wow_ps_judge_pwr_lvl(struct phl_wow_info *wow_info, bool enter_ps)
+{
+	struct rtw_ps_cap_t *ps_cap = _get_ps_cap(wow_info->phl_info);
+
+	if (wow_info->op_mode == RTW_WOW_OP_DISCONNECT_STBY) {
+		/* IPS */
+		wow_info->ps_pwr_lvl = phl_ps_judge_pwr_lvl(ps_cap->ips_wow_cap,
+							    PS_MODE_IPS, enter_ps);
+	} else if (wow_info->op_mode == RTW_WOW_OP_CONNECT_STBY) {
+		/* LPS */
+		wow_info->ps_pwr_lvl = phl_ps_judge_pwr_lvl(ps_cap->lps_wow_cap,
+							    PS_MODE_LPS, enter_ps);
+	} else {
+		PHL_ERR("%s : undefined wowlan op mode.\n", __func__);
+	}
+
+	PHL_TRACE(COMP_PHL_WOW, _PHL_INFO_, "[wow] %s : op mode %d, enter ps %d, pwr lvl %s.\n.",
+			  __func__, wow_info->op_mode, enter_ps, phl_ps_pwr_lvl_to_str(wow_info->ps_pwr_lvl));
 }
 
 /**
@@ -1937,7 +2271,6 @@ exit:
  */
 void phl_wow_ps_pwr_ntfy(struct phl_wow_info *wow_info, bool enter_ps)
 {
-	struct phl_info_t *phl_info = wow_info->phl_info;
 
 	if (wow_info->ps_pwr_lvl == PS_PWR_LVL_PWRON)
 		return;
@@ -1946,7 +2279,7 @@ void phl_wow_ps_pwr_ntfy(struct phl_wow_info *wow_info, bool enter_ps)
 		/* IPS */
 	} else if (wow_info->op_mode == RTW_WOW_OP_CONNECT_STBY) {
 		#ifdef CONFIG_BTCOEX
-		rtw_hal_btc_radio_state_ntfy(phl_info->hal, (enter_ps == true ?
+		rtw_hal_btc_radio_state_ntfy(wow_info->phl_info->hal, (enter_ps == true ?
 							BTC_RFCTRL_FW_CTRL : BTC_RFCTRL_WL_ON));
 		#endif
 	} else {
@@ -2086,5 +2419,4 @@ enum rtw_phl_status rtw_phl_cfg_wow_sw_gpio_ctrl(void *phl, struct rtw_wow_gpio_
 
 	return phl_status;
 }
-
 #endif /* CONFIG_WOWLAN */

@@ -679,11 +679,20 @@ void rtw_phl_test_submodule_init(struct rtw_phl_com_t* phl_com, void *buf)
 {
 	struct test_mgnt_info *test_mgnt = (struct test_mgnt_info *)phl_com->test_mgnt;
 	struct test_module_info *tm_info = NULL;
+#ifdef RTW_MP_INIT_IN_MP_START
+	enum rtw_phl_status phl_status = RTW_PHL_STATUS_FAILURE;
+#endif
 
 	if(buf == NULL)
 		return;
 
 	tm_info = (struct test_module_info *)buf;
+
+#ifdef RTW_MP_INIT_IN_MP_START
+	phl_status = phl_trx_test_init(test_mgnt->phl);
+	if (phl_status != RTW_PHL_STATUS_SUCCESS)
+		PHL_ERR("phl_trx_test_init failed\n");
+#endif
 
 	switch(tm_info->tm_type) {
 		case TEST_SUB_MODULE_MP:
@@ -731,6 +740,10 @@ void rtw_phl_test_submodule_deinit(struct rtw_phl_com_t* phl_com, void *buf)
 		default:
 			break;
 	}
+
+#ifdef RTW_MP_INIT_IN_MP_START
+	phl_trx_test_deinit(test_mgnt->phl);
+#endif
 }
 
 void
