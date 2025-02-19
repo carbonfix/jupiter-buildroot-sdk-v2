@@ -24,6 +24,10 @@
 #include <linux/platform_device.h>
 #include "spacemit-pwrseq.h"
 
+static LIST_HEAD(pwrseq_list);
+/* Protects pwrseq_list */
+static DEFINE_MUTEX(pwrseq_lock);
+
 struct wlan_pwrseq {
 	struct device		*dev;
 	struct spacemit_pwrseq *parent;
@@ -34,15 +38,37 @@ struct wlan_pwrseq {
 	struct gpio_desc *hostwake;
 	int irq;
 
+	const char *type;
+	struct list_head list;
 	struct mutex wlan_mutex;
 };
 
-static struct wlan_pwrseq *pdata = NULL;
 static int spacemit_wlan_on(struct wlan_pwrseq *pwrseq, bool on_off);
 
-void spacemit_wlan_set_power(bool on_off)
+/**
+ * spacemit_get_pwrseq_from_type - returns wlan_pwrseq whose type is the same as sting passed
+ *	in parameter or NULL if searched pwrseq not found
+ * @type: type of searched pwrseq
+ */
+static struct wlan_pwrseq *spacemit_get_pwrseq_from_type(char *type)
 {
-	struct wlan_pwrseq *pwrseq = pdata;
+	struct wlan_pwrseq *pwrseq;
+
+	mutex_lock(&pwrseq_lock);
+	list_for_each_entry(pwrseq, &pwrseq_list, list) {
+		if (type && !strcmp(pwrseq->type, type)) {
+			dev_info(pwrseq->dev, "get pwrseq ok, type: %s\n", pwrseq->type);
+			mutex_unlock(&pwrseq_lock);
+			return pwrseq;
+		}
+	}
+	mutex_unlock(&pwrseq_lock);
+	return NULL;
+}
+
+void spacemit_wlan_set_power(char *type, bool on_off)
+{
+	struct wlan_pwrseq *pwrseq = spacemit_get_pwrseq_from_type(type);
 	int ret = 0;
 
 	if (!pwrseq)
@@ -58,9 +84,9 @@ void spacemit_wlan_set_power(bool on_off)
 }
 EXPORT_SYMBOL_GPL(spacemit_wlan_set_power);
 
-int spacemit_wlan_get_oob_irq(void)
+int spacemit_wlan_get_oob_irq(char *type)
 {
-	struct wlan_pwrseq *pwrseq = pdata;
+	struct wlan_pwrseq *pwrseq = spacemit_get_pwrseq_from_type(type);
 
 	if (!pwrseq)
 		return 0;
@@ -73,9 +99,9 @@ int spacemit_wlan_get_oob_irq(void)
 }
 EXPORT_SYMBOL_GPL(spacemit_wlan_get_oob_irq);
 
-int spacemit_wlan_get_oob_irq_flags(void)
+int spacemit_wlan_get_oob_irq_flags(char *type)
 {
-	struct wlan_pwrseq *pwrseq = pdata;
+	struct wlan_pwrseq *pwrseq = spacemit_get_pwrseq_from_type(type);
 	int oob_irq_flags;
 
 	if (!pwrseq)
@@ -154,9 +180,14 @@ static int spacemit_wlan_probe(struct platform_device *pdev)
 				 &pwrseq->power_on_delay_ms))
 		pwrseq->power_on_delay_ms = 10;
 
-	mutex_init(&pwrseq->wlan_mutex);
-	pdata = pwrseq;
+	if (device_property_read_string(dev, "device_type", &pwrseq->type))
+		pwrseq->type = "sdio";//sdio default
 
+	mutex_init(&pwrseq->wlan_mutex);
+
+	mutex_lock(&pwrseq_lock);
+	list_add_tail(&pwrseq->list, &pwrseq_list);
+	mutex_unlock(&pwrseq_lock);
 	return 0;
 }
 
@@ -165,8 +196,9 @@ static int spacemit_wlan_remove(struct platform_device *pdev)
 	struct wlan_pwrseq *pwrseq = platform_get_drvdata(pdev);
 
 	mutex_destroy(&pwrseq->wlan_mutex);
-	pdata = NULL;
-
+	mutex_lock(&pwrseq_lock);
+	list_del(&pwrseq->list);
+	mutex_unlock(&pwrseq_lock);
 	return 0;
 }
 
