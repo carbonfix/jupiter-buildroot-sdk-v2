@@ -85,20 +85,20 @@ static struct pci_driver rtw89_8852be_driver = {
 };
 
 #if defined(CONFIG_SOC_SPACEMIT_K1X)
-extern int spacemit_wlan_set_power(int on);
+extern int spacemit_wlan_set_power(char *type, int on);
 static int __init rtw89_8852be_driver_init(void)
 {
-	spacemit_wlan_set_power(1);
+	spacemit_wlan_set_power("pcie", 1);
 	return pci_register_driver(&rtw89_8852be_driver);
 }
 module_init(rtw89_8852be_driver_init);
 static void __exit rtw89_8852be_driver_exit(void)
 {
 	pci_unregister_driver(&rtw89_8852be_driver);
-	spacemit_wlan_set_power(0);
+	spacemit_wlan_set_power("pcie", 0);
 }
 module_exit(rtw89_8852be_driver_exit);
-#elif
+#else
 module_pci_driver(rtw89_8852be_driver);
 #endif
 
