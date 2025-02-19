@@ -26,7 +26,7 @@
 static int fw_loaded;
 
 #ifdef CONFIG_PLATFORM_SPACEMIT
-extern void spacemit_wlan_set_power(int on);
+extern void spacemit_wlan_set_power(char *type, int on);
 #endif
 static int aicbsp_platform_power_on(void);
 static void aicbsp_platform_power_off(void);
@@ -74,7 +74,7 @@ void *aicbsp_get_drvdata(void *args)
 static int aicbsp_platform_power_on(void)
 {
 #ifdef CONFIG_PLATFORM_SPACEMIT
-	spacemit_wlan_set_power(1);
+	spacemit_wlan_set_power("usb", 1);
 	mdelay(50);
 #endif
 	return 0;
@@ -83,7 +83,7 @@ static int aicbsp_platform_power_on(void)
 static void aicbsp_platform_power_off(void)
 {
 #ifdef CONFIG_PLATFORM_SPACEMIT
-	spacemit_wlan_set_power(0);
+	spacemit_wlan_set_power("usb", 0);
 	mdelay(100);
 #endif
 	bsp_dbg("%s\n", __func__);

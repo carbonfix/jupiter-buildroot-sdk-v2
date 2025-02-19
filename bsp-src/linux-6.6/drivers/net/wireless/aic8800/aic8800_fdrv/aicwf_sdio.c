@@ -183,8 +183,8 @@ int aicwf_sdio_recv_pkt(struct aic_sdio_dev *sdiodev, struct sk_buff *skbbuf,
 }
 
 #ifdef CONFIG_PLATFORM_SPACEMIT
-extern int spacemit_wlan_set_power(int on);
-extern int spacemit_wlan_get_oob_irq(void);
+extern int spacemit_wlan_set_power(char *type, int on);
+extern int spacemit_wlan_get_oob_irq(char *type);
 extern void spacemit_sdio_detect_change(int enable_scan);
 #endif
 static irqreturn_t rwnx_hostwake_irq_handler(int irq, void *para)
@@ -207,7 +207,7 @@ static int rwnx_register_hostwake_irq(struct device *dev)
 	int wakeup_enable;
 	u32 hostwake_irq_num;
 #ifdef CONFIG_PLATFORM_SPACEMIT
-	hostwake_irq_num = spacemit_wlan_get_oob_irq();
+	hostwake_irq_num = spacemit_wlan_get_oob_irq("sdio");
 	wakeup_enable = 1;
 #endif
 	if (wakeup_enable) {

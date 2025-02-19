@@ -24,8 +24,8 @@
 #include <linux/of_platform.h>
 
 #ifdef CONFIG_PLATFORM_SPACEMIT
-extern int spacemit_wlan_set_power(int on);
-extern int spacemit_wlan_get_oob_irq(void);
+extern int spacemit_wlan_set_power(char *type, int on);
+extern int spacemit_wlan_get_oob_irq(char *type);
 extern void spacemit_sdio_detect_change(int enable_scan);
 #endif
 static int  aicbsp_platform_power_on(void);
@@ -383,7 +383,7 @@ static int aicbsp_platform_power_on(void)
 		bsp_dbg("%s aicbsp_reg_sdio_notify fail(%d)\n", __func__, ret);
 			return ret;
 	}
-	spacemit_wlan_set_power(1);
+	spacemit_wlan_set_power("sdio", 1);
 	spacemit_sdio_detect_change(1);
 
 	if (down_timeout(&aic_chipup_sem, msecs_to_jiffies(2000)) == 0) {
@@ -392,7 +392,7 @@ static int aicbsp_platform_power_on(void)
 	}
 
 	aicbsp_unreg_sdio_notify();
-	spacemit_wlan_set_power(0);
+	spacemit_wlan_set_power("sdio", 0);
 	return -1;
 #else
 	return 0;
@@ -403,7 +403,7 @@ static void aicbsp_platform_power_off(void)
 {
 #ifdef CONFIG_PLATFORM_SPACEMIT
 	spacemit_sdio_detect_change(0);
-	spacemit_wlan_set_power(0);
+	spacemit_wlan_set_power("sdio", 0);
 #endif
 	bsp_dbg("%s\n", __func__);
 }
