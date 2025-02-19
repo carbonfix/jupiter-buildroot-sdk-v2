@@ -115,7 +115,7 @@ static int spacemit_bt_probe(struct platform_device *pdev)
 				 &pwrseq->power_on_delay_ms))
 		pwrseq->power_on_delay_ms = 10;
 
-	pwrseq->rfkill = rfkill_alloc("spacemit-bt", dev, RFKILL_TYPE_BLUETOOTH,
+	pwrseq->rfkill = rfkill_alloc(pdev->name, dev, RFKILL_TYPE_BLUETOOTH,
 				    &spacemit_bt_rfkill_ops, pwrseq);
 	if (!pwrseq->rfkill) {
 		dev_err(dev, "failed alloc bt rfkill\n");
