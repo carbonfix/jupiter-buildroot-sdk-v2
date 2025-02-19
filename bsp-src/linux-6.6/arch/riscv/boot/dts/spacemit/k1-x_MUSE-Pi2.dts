@@ -822,11 +822,11 @@
 
 &udc1 {
 	spacemit,udc-mode = <MV_USB_MODE_OTG>;
-	status = "okay";
+	status = "disabled";
 };
 
 &ehci1 {
-	spacemit,udc-mode = <MV_USB_MODE_OTG>;
+	spacemit,udc-mode = <MV_USB_MODE_HOST>;
 	spacemit,reset-on-resume;
 	status = "okay";
 };
@@ -837,7 +837,7 @@
 	spacemit,reset-on-resume;
 	role-switch-default-mode = "host";
 	vbus-gpios = <&gpio 123 0>;
-	status = "okay";
+	status = "disabled";
 };
 
 &usb2phy {
@@ -849,7 +849,10 @@
 };
 
 &usb3hub {
-	vbus-gpios = <&gpio 79 0>;	/* gpio_79 for usb3 hub output vbus */
+	hub-gpios = <
+		&gpio 127 0	/* usb3 hub en */
+		&gpio 123 0>;	/* usb3 hub rst*/
+	vbus-gpios = <&gpio 79 0>;	/* usb3 hub output vbus */
 	status = "okay";
 };
 
