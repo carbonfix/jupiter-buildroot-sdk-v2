@@ -2290,9 +2290,6 @@ static int fts_notifier_callback_init(struct fts_ts_data *ts_data)
 #if IS_ENABLED(CONFIG_DRM)
     ts_data->fb_notif.notifier_call = fb_notifier_callback;
 #if IS_ENABLED(CONFIG_DRM_PANEL)
-    ret = drm_check_dt(ts_data);
-    if (ret) FTS_ERROR("parse drm-panel fail");
-    FTS_INFO("init notifier with drm_panel_notifier_register");
 #ifdef CONFIG_DRM_SPACEMIT
     spacemit_drm_register_client(&ts_data->fb_notif);
 #endif
