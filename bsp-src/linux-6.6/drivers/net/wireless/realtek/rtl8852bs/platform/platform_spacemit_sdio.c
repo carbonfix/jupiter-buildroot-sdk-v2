@@ -14,13 +14,13 @@
  *****************************************************************************/
 #include <drv_types.h>
 
-extern int spacemit_wlan_set_power(int on);
-extern int spacemit_wlan_get_oob_irq(void);
+extern int spacemit_wlan_set_power(char *type, int on);
+extern int spacemit_wlan_get_oob_irq(char *type);
 extern void spacemit_sdio_detect_change(int enable_scan);
 
 void platform_wifi_get_oob_irq(int *oob_irq)
 {
-	*oob_irq = spacemit_wlan_get_oob_irq();
+	*oob_irq = spacemit_wlan_get_oob_irq("sdio");
 }
 
 void platform_wifi_mac_addr(u8 *mac_addr)
@@ -42,7 +42,7 @@ int platform_wifi_power_on(void)
 	RTW_PRINT("==== Launching Wi-Fi driver! (Powered by Spacemit) ====\n");
 	RTW_PRINT("=======================================================\n");
 	RTW_PRINT("Realtek %s WiFi driver (Powered by Spacemit,Ver %s) init.\n", DRV_NAME, DRIVERVERSION);
-	spacemit_wlan_set_power(1);
+	spacemit_wlan_set_power("sdio", 1);
 	spacemit_sdio_detect_change(1);
 
 	return ret;
@@ -56,5 +56,5 @@ void platform_wifi_power_off(void)
 	RTW_PRINT("=======================================================\n");
 	RTW_PRINT("Realtek %s WiFi driver (Powered by Spacemit,Ver %s) init.\n", DRV_NAME, DRIVERVERSION);
 	spacemit_sdio_detect_change(0);
-	spacemit_wlan_set_power(0);
+	spacemit_wlan_set_power("sdio", 0);
 }
