@@ -162,6 +162,7 @@
 		wlan_pwrseq: wlan-pwrseq {
 			compatible = "spacemit,wlan-pwrseq";
 			regon-gpios     = <&gpio 76 0>;
+			device_type     = "pcie";
 		};
 
 		bt_pwrseq: bt-pwrseq {
