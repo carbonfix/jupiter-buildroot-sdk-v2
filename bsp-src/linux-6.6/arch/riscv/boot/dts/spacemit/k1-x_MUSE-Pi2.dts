@@ -631,6 +631,16 @@
 			K1X_PADCONF(GPIO_66, MUX_MODE0, (EDGE_FALL | PULL_DOWN | PAD_3V_DS2))   /* wifi edge detect */
 		>;
 	};
+
+	pinctrl_sspa0_2: sspa0_2_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_111, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_clk */
+			K1X_PADCONF(GPIO_112, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_frm */
+			K1X_PADCONF(GPIO_120, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_txd */
+			K1X_PADCONF(GPIO_121, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_rxd */
+			K1X_PADCONF(GPIO_122, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_sysclk */
+		>;
+	};
 };
 
 &gpio{
@@ -1031,7 +1041,7 @@
 
 &i2s0 {
         pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_sspa0_0>;
+        pinctrl-0 = <&pinctrl_sspa0_2>;
         status = "okay";
 };
 
