@@ -641,6 +641,14 @@
 			K1X_PADCONF(GPIO_122, MUX_MODE3, (EDGE_NONE | PULL_UP | PAD_1V8_DS0))   /* sspa0_sysclk */
 		>;
 	};
+
+	pinctrl_pcie2_5: pcie2_5_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_62,  MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))	/* PCIe2_perstn */
+			K1X_PADCONF(GPIO_36,  MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))	/* PCIe2_waken */
+			K1X_PADCONF(GPIO_117, MUX_MODE4, (EDGE_NONE | PULL_DIS | PAD_1V8_DS2))	/* PCIe2_clkreqn */
+		>;
+	};
 };
 
 &gpio{
@@ -882,7 +890,7 @@
 
 &pcie2_rc {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_pcie2_4>;
+	pinctrl-0 = <&pinctrl_pcie2_5>;
 	status = "okay";
 };
 
