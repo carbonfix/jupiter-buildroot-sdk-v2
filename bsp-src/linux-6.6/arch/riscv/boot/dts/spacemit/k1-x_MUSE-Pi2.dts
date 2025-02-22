@@ -796,6 +796,21 @@
 			device_type = "ethernet-phy";
 			reg = <0x1>;
 			phy-mode = "rgmii";
+
+			leds {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				lan0-led1@1 {
+					reg = <1>;
+					linux,default-trigger = "netdev";
+				};
+
+				lan0-led2@2 {
+					reg = <2>;
+					linux,default-trigger = "netdev";
+				};
+			};
 		};
 	};
 };
