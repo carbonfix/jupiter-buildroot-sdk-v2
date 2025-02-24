@@ -30,7 +30,7 @@
 #include <linux/dma-direction.h>
 #include <linux/spacemit/platform_pm_ops.h>
 #include <linux/suspend.h>
-#include "remoteproc_internal.h"
+#include "../remoteproc_internal.h"
 
 #define MAX_MEM_BASE	2
 #define MAX_MBOX	2

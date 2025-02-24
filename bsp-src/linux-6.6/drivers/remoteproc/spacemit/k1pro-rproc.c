@@ -11,7 +11,7 @@
 #include <linux/clk.h>
 #include <linux/clkdev.h>
 #include <linux/clk-provider.h>
-#include "remoteproc_internal.h"
+#include "../remoteproc_internal.h"
 
 struct spacemit_rproc {
 	struct reset_control *rst;
