@@ -670,7 +670,7 @@ static void spacemit_sdhci_set_clock(struct sdhci_host *host, unsigned int clock
 				pr_warn("could not get sdhci fast pinctrl state.\n");
 			else
 				pinctrl_select_state(spacemit->pinctrl, spacemit->pin);
-		} else if (clock == 0) {
+		} else if ((clock == 0) || (mmc->ios.bus_width < MMC_BUS_WIDTH_4)) {
 			spacemit->pin = pinctrl_lookup_state(spacemit->pinctrl, "debug");
 			if (IS_ERR(spacemit->pin))
 				pr_debug("could not get sdhci debug pinctrl state. ignore it\n");
