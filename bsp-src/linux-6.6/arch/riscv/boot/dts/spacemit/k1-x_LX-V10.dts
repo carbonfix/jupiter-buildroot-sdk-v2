@@ -675,7 +675,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gmac0>;
 
-	emac,reset-gpio = <&gpio 110 0>;
+	emac,reset-gpio = <&gpio 81 0>;
 	emac,reset-active-low;
 	emac,reset-delays-us = <0 10000 100000>;
 
@@ -716,7 +716,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gmac1>;
 
-	emac,reset-gpio = <&gpio 115 0>;
+	emac,reset-gpio = <&gpio 97 0>;
 	emac,reset-active-low;
 	emac,reset-delays-us = <0 10000 100000>;
 
