@@ -305,7 +305,7 @@ int emac_init_hw(struct emac_priv *priv)
 	val = priv->rx_coal_frames & MREGBIT_RECEIVE_IRQ_FRAME_COUNTER_MSK;
 
 	/* set emac rx mitigation timeout */
-	val |= (priv->rx_coal_timeout << MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_OFST) &
+	val |= ((priv->rx_coal_timeout * AXI_CLK_CYCLES_PER_US) << MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_OFST) &
 		MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_MSK;
 
 	/* enable emac rx irq mitigation */
@@ -1955,6 +1955,23 @@ static int clk_phase_rmii_set(struct emac_priv *priv, bool is_tx)
 	return 0;
 }
 
+static int rx_coal_param_set(struct emac_priv *priv)
+{
+	u32 val;
+	val = emac_rd(priv, DMA_RECEIVE_IRQ_MITIGATION_CTRL);
+
+	val &= ~MREGBIT_RECEIVE_IRQ_FRAME_COUNTER_MSK;
+	val |= (priv->rx_coal_frames & MREGBIT_RECEIVE_IRQ_FRAME_COUNTER_MSK);
+
+	val &= ~MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_MSK;
+	val |= ((priv->rx_coal_timeout * AXI_CLK_CYCLES_PER_US) << MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_OFST) &
+            MREGBIT_RECEIVE_IRQ_TIMEOUT_COUNTER_MSK;
+
+	emac_wr(priv, DMA_RECEIVE_IRQ_MITIGATION_CTRL, val);
+
+	return 0;
+}
+
 static int clk_phase_set(struct emac_priv *priv, bool is_tx)
 {
 	if (priv->clk_tuning_enable) {
@@ -2456,7 +2473,56 @@ static void emac_get_drvinfo(struct net_device *dev,
 	info->n_stats = ARRAY_SIZE(emac_ethtool_stats);
 }
 
+static int emac_get_coalesce(struct net_device *ndev,
+	struct ethtool_coalesce *c,
+	struct kernel_ethtool_coalesce *kernel_coal,
+	struct netlink_ext_ack *extack)
+{
+	struct emac_priv *priv = netdev_priv(ndev);
+
+	c->rx_coalesce_usecs = priv->rx_coal_timeout;
+	c->rx_max_coalesced_frames = priv->rx_coal_frames;
+
+	c->rx_max_coalesced_frames_low = MIN_RX_COAL_FRAMES;
+	c->rx_max_coalesced_frames_high = MAX_RX_COAL_FRAMES;
+
+	c->rx_coalesce_usecs_low = MIN_RX_COAL_TIMEOUT;
+	c->rx_coalesce_usecs_high = MAX_RX_COAL_TIMEOUT;
+
+	return 0;
+}
+
+static int emac_set_coalesce(struct net_device *ndev,
+	struct ethtool_coalesce *c,
+	struct kernel_ethtool_coalesce *kernel_coal,
+	struct netlink_ext_ack *extack)
+{
+	struct emac_priv *priv = netdev_priv(ndev);
+
+	if ((c->rx_max_coalesced_frames > MAX_RX_COAL_FRAMES) ||
+		(c->rx_max_coalesced_frames < MIN_RX_COAL_FRAMES))
+		return -EINVAL;
+
+	if ((c->rx_coalesce_usecs > MAX_RX_COAL_TIMEOUT) ||
+		(c->rx_coalesce_usecs < MIN_RX_COAL_TIMEOUT))
+		return -EINVAL;
+
+	/* Only update hardware if a change occurred. */
+	if (priv->rx_coal_frames == c->rx_max_coalesced_frames &&
+			priv->rx_coal_timeout == c->rx_coalesce_usecs)
+		return 0;
+
+	priv->rx_coal_frames = c->rx_max_coalesced_frames;
+	priv->rx_coal_timeout = c->rx_coalesce_usecs;
+
+	rx_coal_param_set(priv);
+
+	return 0;
+}
+
 static const struct ethtool_ops emac_ethtool_ops = {
+	.supported_coalesce_params = ETHTOOL_COALESCE_RX_USECS |
+			ETHTOOL_COALESCE_RX_MAX_FRAMES,
 	.get_link_ksettings     = emac_get_link_ksettings,
 	.set_link_ksettings     = emac_set_link_ksettings,
 	.get_drvinfo            = emac_get_drvinfo,
@@ -2468,6 +2534,8 @@ static const struct ethtool_ops emac_ethtool_ops = {
 	.get_regs		= emac_ethtool_get_regs,
 	.get_regs_len		= emac_ethtool_get_regs_len,
 	.get_ts_info 		= emac_get_ts_info,
+	.get_coalesce		= emac_get_coalesce,
+	.set_coalesce		= emac_set_coalesce,
 };
 
 static const struct net_device_ops emac_netdev_ops = {

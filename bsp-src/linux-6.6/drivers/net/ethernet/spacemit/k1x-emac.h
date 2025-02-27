@@ -457,10 +457,20 @@
 #define DEFAULT_RX_COAL_FRAMES				64
 
 /* axi clk 312M, 1us = 312 cycle,
- * every packet almost take 120us when operate at 100Mbps
- * so we set 5 packet delay time which 600us as rx coal timeout
+ * every packet almost take 12us when operate at 1000Mbps
+ * so we set 10 packet delay time which 120us as rx coal timeout
  */
-#define DEFAULT_RX_COAL_TIMEOUT			(120 * 312)
+#define DEFAULT_RX_COAL_TIMEOUT		120
+
+#define AXI_CLK_CYCLES_PER_US			312
+
+#define MAX_RX_COAL_FRAMES			255
+
+#define MIN_RX_COAL_FRAMES			1
+
+#define MAX_RX_COAL_TIMEOUT			3000
+
+#define MIN_RX_COAL_TIMEOUT			24
 
 /* only works for sizes that are powers of 2 */
 #define EMAC_ROUNDUP(i, size) ((i) = (((i) + (size) - 1) & ~((size) - 1)))
