@@ -30,3 +30,4 @@ obj-$(CONFIG_SPACEMIT_MIPI_PANEL) += spacemit_mipi_panel.o
 obj-$(CONFIG_SPACEMIT_HDMI) += spacemit_hdmi.o
 obj-$(CONFIG_DRM_LT8911EXB) += lt8911exb.o
 obj-$(CONFIG_DRM_LT9711) += lt9711.o
+obj-$(CONFIG_DRM_RASPBERRYPI_TOUCHSCREEN) += raspberrypi_touchscreen.o
