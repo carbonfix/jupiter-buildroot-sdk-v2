@@ -179,6 +179,14 @@
 		pwms = <&rpwm2 10000>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 64 128 192 255>;
+		status = "disabled";
+	};
+
+	gpio79_irq {
+		compatible = "gpio-irq-test";
+		pinctrl-0 = <&gpio79_interupt>;
+		interrupt-parent = <&gpio>;
+		gpios = <&gpio 79 GPIO_ACTIVE_LOW>;
 		status = "okay";
 	};
 };
@@ -192,7 +200,7 @@
 &uart2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart2>;
-	status = "okay";
+	status = "disabled";
 };
 
 &uart3 {
@@ -204,7 +212,7 @@
 &r_uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_r_uart1>;
-	status = "okay";
+	status = "disabled";
 };
 
 &uart5 {
@@ -215,14 +223,14 @@
 
 &uart8 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_uart8_2>;
+	pinctrl-0 = <&pinctrl_uart8_3>;
 	status = "okay";
 };
 
 &pwm14 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm14_1>;
-	status = "okay";
+	status = "disabled";
 };
 
 &dpu_online2_dsi {
@@ -249,11 +257,7 @@
 		//force-attached = "lcd_jd9365da_mipi_1280x800";
 	};
 };
-/*
-&lcds {
-	status = "disabled";
-};
-*/
+
 &dpu_online2_hdmi {
 	memory-region = <&dpu_resv>;
 	status = "disabled";
@@ -581,6 +585,7 @@
 
 &pinctrl {
 	pinctrl-single,gpio-range = <
+		&range GPIO_47  2 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_3V_DS2)
 		&range GPIO_49  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_58  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_63  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
@@ -590,6 +595,7 @@
 		&range PRI_TCK  1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range PRI_TDO  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_74  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_79  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN   | PAD_3V_DS2)
 		&range GPIO_80  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_81  3 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_90  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
@@ -608,12 +614,12 @@
 		&range GPIO_125 3 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 	>;
 
-	pinctrl_rcpu: pinctrl_rcpu_grp {
-		pinctrl-single,pins = <
-			K1X_PADCONF(GPIO_47,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_tx */
-			K1X_PADCONF(GPIO_48,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_rx */
-		>;
-	};
+	/* pinctrl_rcpu: pinctrl_rcpu_grp { */
+	/* 	pinctrl-single,pins = < */
+	/* 		K1X_PADCONF(GPIO_47,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/1* r_uart0_tx *1/ */
+	/* 		K1X_PADCONF(GPIO_48,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/1* r_uart0_rx *1/ */
+	/* 	>; */
+	/* }; */
 
 	pinctrl_r_uart1: r_uart1_grp {
 		pinctrl-single,pins =<
@@ -621,6 +627,14 @@
 			K1X_PADCONF(GPIO_52,   MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_3V_DS4))  /* r_uart1_rxd */
 		>;
 	};
+
+	pinctrl_uart8_3: uart8_3_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_75, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* uart8_txd */
+			K1X_PADCONF(GPIO_76, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* uart8_rxd */
+		>;
+	};
+
 
 	pinctrl_gmac0: gmac0_grp {
 		pinctrl-single,pins =<
@@ -676,10 +690,16 @@
 			K1X_PADCONF(GPIO_82, MUX_MODE2, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))	/* uart3_rxd */
 		>;
 	};
+	gpio79_interupt: gpio_interupt_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_79, MUX_MODE0, (EDGE_RISE | PULL_DOWN | PAD_3V_DS2))
+		>;
+	};
 };
 
 &gpio{
 	gpio-ranges = <
+		&pinctrl 47  GPIO_47  2
 		&pinctrl 49  GPIO_49  2
 		&pinctrl 58  GPIO_58  1
 		&pinctrl 63  GPIO_63  3
@@ -733,7 +753,7 @@
 	spacemit,tx_delaycode = <0x6f>;
 	spacemit,rx_tuning_limit = <50>;
 	spacemit,sdh-freq = <204800000>;
-	status = "disabled";
+	status = "okay";
 };
 
 /* SDIO */
@@ -1084,11 +1104,11 @@
 };
 
 &rcpu {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rcpu>;
+	/* pinctrl-names = "default"; */
+	/* pinctrl-0 = <&pinctrl_rcpu>; */
 	mboxes = <&mailbox 0>, <&mailbox 1>;
 	mbox-names = "vq0", "vq1";
-	memory-region = <&rcpu_mem_0>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>;
+	memory-region = <&rcpu_mem_0>, <&rcpu_mem_heap>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>;
 	status = "okay";
 };
 
@@ -1193,8 +1213,3 @@
 	};
 };
 
-&rpwm2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rpwm2_0>;
-	status = "okay";
-};
