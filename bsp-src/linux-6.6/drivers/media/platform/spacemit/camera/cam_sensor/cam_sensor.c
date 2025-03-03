@@ -51,6 +51,7 @@ static int camsnr_major;
 static struct class *camsnr_class;
 struct gpio_desc *gpio_dvdden = NULL;
 struct gpio_desc *gpio_dcdcen = NULL;
+static int dvdd_powen_cnt = 0;
 
 #define SENSOR_DRIVER_CHECK_POINTER(ptr)			\
 	do {							\
@@ -102,9 +103,11 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 			if (ret < 0)
 				goto dvdd_err;
 		}
-		/* dvdden-gpios */
-		if (!IS_ERR_OR_NULL(gpio_dvdden))	// msnr_dev->dvdden
-			gpiod_direction_output(gpio_dvdden, 1);	// msnr_dev->dvdden
+		/* dvdden-powen-gpios */
+		if (!IS_ERR_OR_NULL(gpio_dvdden)) {
+			dvdd_powen_cnt++;
+			gpiod_direction_output(gpio_dvdden, 1);
+		}
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd)) {
 			regulator_set_voltage(msnr_dev->afvdd, 2800000, 2800000);
 			ret = regulator_enable(msnr_dev->afvdd);
@@ -140,12 +143,16 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 		if (!IS_ERR_OR_NULL(msnr_dev->dovdd))
 			regulator_disable(msnr_dev->dovdd);
 		/* dvdden-gpios */
-		if (!IS_ERR_OR_NULL(gpio_dvdden))	// msnr_dev->dvdden
-			gpiod_direction_output(gpio_dvdden, 0);	//msnr_dev->dvdden
+		if (!IS_ERR_OR_NULL(gpio_dvdden)) {
+			dvdd_powen_cnt--;
+			if (dvdd_powen_cnt == 0)
+				gpiod_direction_output(gpio_dvdden, 0);
+		}
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd))
 			regulator_disable(msnr_dev->afvdd);
 
-		clk_disable_unprepare(msnr_dev->mclk);
+		if (msnr_dev->mclk)
+			clk_disable_unprepare(msnr_dev->mclk);
 		cam_dbg("sensor%d reset", msnr_dev->id);
 	}
 
@@ -358,8 +365,16 @@ static int camsnr_set_gpio_enable(unsigned long arg, struct cam_sensor_device *m
 			gpiod_direction_output(msnr_dev->rst, enable);
 		break;
 	case SENSOR_GPIO_DVDDEN:
-		if (!IS_ERR_OR_NULL(gpio_dvdden))
-			gpiod_direction_output(gpio_dvdden, enable);
+		if (!IS_ERR_OR_NULL(gpio_dvdden)) {
+			if (enable) {
+				dvdd_powen_cnt++;
+				gpiod_direction_output(gpio_dvdden, enable);
+			} else {
+				dvdd_powen_cnt--;
+				if (dvdd_powen_cnt == 0)
+					gpiod_direction_output(gpio_dvdden, enable);
+			}
+		}
 		break;
 	case SENSOR_GPIO_DCDCEN:
 		if (!IS_ERR_OR_NULL(msnr_dev->dcdcen))
@@ -1354,52 +1369,70 @@ static int camsnr_of_parse(struct cam_sensor_device *sensor)
 	}
 	sensor->dphy_no = (u8) dphy_no;
 
-	sensor->afvdd = devm_regulator_get(dev, "af_2v8");
+	sensor->afvdd = devm_regulator_get_exclusive(dev, "af_2v8");
 	if (IS_ERR(sensor->afvdd)) {
 		dev_warn(dev, "Failed to get regulator af_2v8\n");
 		sensor->afvdd = NULL;
 	}
 
-	sensor->avdd = devm_regulator_get(dev, "avdd_2v8");
+	sensor->avdd = devm_regulator_get_exclusive(dev, "avdd_2v8");
 	if (IS_ERR(sensor->avdd)) {
 		dev_warn(dev, "Failed to get regulator avdd_2v8\n");
 		sensor->avdd = NULL;
 	}
 
-	sensor->dovdd = devm_regulator_get(dev, "dovdd_1v8");
+	sensor->dovdd = devm_regulator_get_exclusive(dev, "dovdd_1v8");
 	if (IS_ERR(sensor->dovdd)) {
 		dev_warn(dev, "Failed to get regulator dovdd_1v8\n");
 		sensor->dovdd = NULL;
 	}
 
-	sensor->dvdd = devm_regulator_get(dev, "dvdd_1v2");
+	sensor->dvdd = devm_regulator_get_exclusive(dev, "dvdd_1v2");
 	if (IS_ERR(sensor->dvdd)) {
 		dev_warn(dev, "Failed to get regulator dvdd_1v2\n");
 		sensor->dvdd = NULL;
 	}
 
-	ret = of_property_read_string(of_node, "clock-names", &sensor->mclk_name);
-	if (!ret) {
-		if (strcmp(sensor->mclk_name, "cam_mclk0") && strcmp(sensor->mclk_name, "cam_mclk1") && strcmp(sensor->mclk_name, "cam_mclk2")) {
-			cam_err("%s: error! only support cam_mclk0~2!", __func__);
-			return -EINVAL;
+	//one or more sensor use the same gpio to control ldo power
+	if (gpio_dvdden == NULL) {
+		gpio_dvdden = devm_gpiod_get(dev, "dvdd-powen", GPIOD_OUT_HIGH);
+		if (IS_ERR(gpio_dvdden)) {
+			gpio_dvdden = NULL;
+		} else {
+			ret = gpiod_direction_output(gpio_dvdden, 0);
+			if (ret < 0) {
+				cam_err("Failed to init sensor%d dvdd-powen gpio", cell_id);
+				goto st_err;
+			}
 		}
-	} else {
-		cam_err("%s: clock-names read failed", __func__);
-		return ret;
 	}
 
+	sensor->dis_mclk = of_property_read_bool(of_node, "mclk-disable");
+	if (!sensor->dis_mclk) {
+		ret = of_property_read_string(of_node, "clock-names", &sensor->mclk_name);
+		if (!ret) {
+			if (strcmp(sensor->mclk_name, "cam_mclk0") && strcmp(sensor->mclk_name, "cam_mclk1") && strcmp(sensor->mclk_name, "cam_mclk2")) {
+				cam_err("%s: error! only support cam_mclk0~2!", __func__);
+				return -EINVAL;
+			}
+		} else {
+			cam_err("%s: clock-names read failed", __func__);
+			return ret;
+		}
+	}
 	// mclk/pwdn/rst multiplex
 	sensor->is_pinmulti = of_property_read_bool(of_node, "pinmulti-enable");
 	if (!sensor->is_pinmulti) {
-		/* mclks */
-		sensor->mclk = devm_clk_get(dev, sensor->mclk_name);
-		if (IS_ERR(sensor->mclk)) {
-			cam_err("unable to get cam_mclk%d\n", cell_id);
-			ret = PTR_ERR(sensor->mclk);
-			goto st_err;
+		if (!sensor->dis_mclk) {
+			sensor->mclk = devm_clk_get(dev, sensor->mclk_name);
+			if (IS_ERR(sensor->mclk)) {
+				cam_err("unable to get cam_mclk%d\n", cell_id);
+				ret = PTR_ERR(sensor->mclk);
+				goto st_err;
+			}
+		} else {
+			sensor->mclk = NULL;
 		}
-
 		/* pwdn-gpios */
 		sensor->pwdn = devm_gpiod_get(dev, "pwdn", GPIOD_OUT_HIGH);
 		if (IS_ERR(sensor->pwdn)) {
