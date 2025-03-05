@@ -1282,8 +1282,7 @@ static void charger_detect_work_func(struct work_struct *work)
 	mutex_unlock(&sgm->lock);
 
 	if(!sgm->state.vbus_gd) {
-		dev_err(sgm->dev, "Vbus not present, disable charge\n");
-		sgm4154x_disable_charger(sgm);
+		dev_err(sgm->dev, "Vbus not present\n");
 		goto err;
 	}
 	if(!state.online)
@@ -1294,8 +1293,7 @@ static void charger_detect_work_func(struct work_struct *work)
 
 #if (defined(__SGM41542_CHIP_ID__)|| defined(__SGM41516D_CHIP_ID__)|| defined(__SGM41543D_CHIP_ID__)|| defined(__SGM41513D_CHIP_ID__)|| defined(__SGM41513A_CHIP_ID__))
 	if(!sgm4154x_dpdm_detect_is_done(sgm)) {
-		dev_err(sgm->dev, "DPDM detecte not done, disable charge\n");
-		sgm4154x_disable_charger(sgm);
+		dev_err(sgm->dev, "DPDM detect not done\n");
 		goto err;
 	}
 	switch(sgm->state.chrg_type) {
@@ -1340,8 +1338,6 @@ static void charger_detect_work_func(struct work_struct *work)
 	dev_err(sgm->dev, "Update: curr_in_limit = %d\n", curr_in_limit);
 	sgm4154x_set_input_curr_lim(sgm, curr_in_limit);
 #endif
-	//enable charge
-	sgm4154x_enable_charger(sgm);
 	sgm4154x_dump_register(sgm);
 err:
 	//release wakelock
@@ -2005,6 +2001,8 @@ static int sgm4154x_probe(struct i2c_client *client)
 
 	schedule_delayed_work(&sgm->charge_monitor_work,100);
 
+	//enable charge
+	sgm4154x_enable_charger(sgm);
 	return ret;
 error_out:
 	if (!IS_ERR_OR_NULL(sgm->usb2_phy))
