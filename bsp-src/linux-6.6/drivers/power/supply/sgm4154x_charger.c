@@ -1341,10 +1341,6 @@ static void charger_detect_work_func(struct work_struct *work)
 	sgm4154x_set_input_curr_lim(sgm, curr_in_limit);
 #endif
 	//enable charge
-#if defined(__SGM41513_CHIP_ID__)
-	curr_in_limit = 1000000;
-	sgm4154x_set_input_curr_lim(sgm, curr_in_limit);
-#endif
 	sgm4154x_enable_charger(sgm);
 	sgm4154x_dump_register(sgm);
 err:
