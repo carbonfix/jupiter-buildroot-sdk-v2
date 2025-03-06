@@ -1258,9 +1258,11 @@ static void charger_detect_work_func(struct work_struct *work)
 	struct delayed_work *charge_detect_delayed_work = NULL;
 	struct sgm4154x_device * sgm = NULL;
 	//static int charge_type_old = 0;
-	int curr_in_limit = 0;
 	struct sgm4154x_state state;
 	int ret;
+#if (defined(__SGM41542_CHIP_ID__)|| defined(__SGM41516D_CHIP_ID__)|| defined(__SGM41543D_CHIP_ID__)|| defined(__SGM41513D_CHIP_ID__)|| defined(__SGM41513A_CHIP_ID__))
+	int curr_in_limit = 0;
+#endif
 
 	charge_detect_delayed_work = container_of(work, struct delayed_work, work);
 	if(charge_detect_delayed_work == NULL) {
