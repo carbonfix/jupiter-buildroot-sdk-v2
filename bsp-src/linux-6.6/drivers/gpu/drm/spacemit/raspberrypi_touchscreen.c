@@ -406,7 +406,7 @@ static int rpi_touchscreen_probe(struct i2c_client *i2c)
 	ver = rpi_touchscreen_i2c_read(ts, REG_ID);
 	if (ver < 0) {
 		dev_err(dev, "Atmel I2C read failed: %d\n", ver);
-		// return -ENODEV;
+		return -ENODEV;
 	}
 
 	switch (ver) {
@@ -415,7 +415,7 @@ static int rpi_touchscreen_probe(struct i2c_client *i2c)
 		break;
 	default:
 		DRM_INFO("%s,Unknown Atmel firmware revision: 0x%02x\n", __func__, ver);
-		// return -ENODEV;
+		return -ENODEV;
 	}
 
 	/* Turn off at boot, so we can cleanly sequence powering on. */
