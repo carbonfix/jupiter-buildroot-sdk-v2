@@ -736,7 +736,7 @@ static struct mipi_dsi_driver spacemit_panel_driver = {
 		.of_match_table = panel_of_match,
 	},
 	.probe = spacemit_panel_probe,
-	.shutdown = spacemit_panel_remove,
+	.remove = spacemit_panel_remove,
 };
 module_mipi_dsi_driver(spacemit_panel_driver);
 
