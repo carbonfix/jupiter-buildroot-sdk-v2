@@ -11,7 +11,7 @@
 #include "k1-x_opp_table.dtsi"
 #include "k1-x_thermal_cooling.dtsi"
 #include <dt-bindings/gpio/gpio.h>
-
+#include <dt-bindings/interrupt-controller/irq.h>
 
 / {
 	model = "spacemit k1-x LX-V10 board";
@@ -267,7 +267,19 @@
 &i2c4 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c4_2>;
-	status = "disabled";
+	status = "okay";
+
+	hym8563: rtc@51 {
+		compatible = "haoyu,hym8563";
+		reg = <0x51>;
+		interrupt-parent = <&gpio>;
+		interrupts = <50 IRQ_TYPE_EDGE_FALLING>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_rtc>;
+		#clock-cells = <0>;
+		clock-output-names = "xin32k";
+		status = "okay";
+	};
 };
 
 &i2c7 {
@@ -562,6 +574,13 @@
 			K1X_PADCONF(GPIO_66, MUX_MODE0, (EDGE_FALL | PULL_DOWN | PAD_3V_DS2))   /* wifi edge detect */
 		>;
 	};
+
+	pinctrl_rtc: rtc_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(GPIO_50, MUX_MODE0, (EDGE_NONE | PULL_UP | PAD_3V_DS2))
+		>;
+	};
+
 };
 
 &gpio{
