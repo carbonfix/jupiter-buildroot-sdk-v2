@@ -38,6 +38,7 @@ struct cam_sensor_device {
 	bool dis_mclk;
 	bool is_pinmulti;
 	bool req_pinmulti;
+	bool is_usedvdden;
 	struct pinctrl *pinctrl;
 	struct pinctrl_state *pinctrl_state;
 

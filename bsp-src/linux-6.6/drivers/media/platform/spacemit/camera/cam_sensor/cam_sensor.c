@@ -107,6 +107,9 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 		if (!IS_ERR_OR_NULL(gpio_dvdden)) {
 			dvdd_powen_cnt++;
 			gpiod_direction_output(gpio_dvdden, 1);
+			msnr_dev->is_usedvdden = true;
+
+			cam_info("sensor%d dvdd_powen_cnt++, %d", msnr_dev->id, dvdd_powen_cnt);
 		}
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd)) {
 			regulator_set_voltage(msnr_dev->afvdd, 2800000, 2800000);
@@ -147,6 +150,9 @@ static int cam_sensor_power_set(struct cam_sensor_device *msnr_dev, u32 on)
 			dvdd_powen_cnt--;
 			if (dvdd_powen_cnt == 0)
 				gpiod_direction_output(gpio_dvdden, 0);
+			msnr_dev->is_usedvdden = false;
+
+			cam_info("sensor%d dvdd_powen_cnt--, %d", msnr_dev->id, dvdd_powen_cnt);
 		}
 		if (!IS_ERR_OR_NULL(msnr_dev->afvdd))
 			regulator_disable(msnr_dev->afvdd);
@@ -369,11 +375,14 @@ static int camsnr_set_gpio_enable(unsigned long arg, struct cam_sensor_device *m
 			if (enable) {
 				dvdd_powen_cnt++;
 				gpiod_direction_output(gpio_dvdden, enable);
+				msnr_dev->is_usedvdden = true;
 			} else {
 				dvdd_powen_cnt--;
 				if (dvdd_powen_cnt == 0)
 					gpiod_direction_output(gpio_dvdden, enable);
+				msnr_dev->is_usedvdden = false;
 			}
+			cam_info("sensor%d SENSOR_GPIO_DVDDEN, en:%d, dvdd_powen_cnt:%d", msnr_dev->id, enable, dvdd_powen_cnt);
 		}
 		break;
 	case SENSOR_GPIO_DCDCEN:
@@ -568,7 +577,7 @@ static int cam_sensor_write(struct cam_i2c_data *data,
 	}
 	ret = i2c_transfer(adapter, &msg, 1);
 	if (ret < 0) {
-		cam_err("%s: i2c transfer data fail", __func__);
+		cam_err("i2c transfer data fail, ret = %d", ret);
 		cam_sensor_i2c_dumpinfo(&msg, 1);
 		mutex_unlock(pcmd_mutex);
 		return ret;
@@ -1235,6 +1244,13 @@ static int camsnr_release(struct inode *inode, struct file *file)
 
 		clk_disable_unprepare(msnr_dev->mclk);
 	}
+	if (msnr_dev->is_usedvdden) {
+		msnr_dev->is_usedvdden = false;
+		dvdd_powen_cnt--;
+		if (dvdd_powen_cnt == 0)
+			gpiod_direction_output(gpio_dvdden, 0);
+		cam_info("sensor%d release, dvdd_powen_cnt:%d", msnr_dev->id, dvdd_powen_cnt);
+	}
 
 	if (msnr_dev->is_pinmulti && msnr_dev->req_pinmulti == true && use_pinmulti == true)
 		release_res_in_pinmulti_mode(msnr_dev);
@@ -1371,25 +1387,25 @@ static int camsnr_of_parse(struct cam_sensor_device *sensor)
 
 	sensor->afvdd = devm_regulator_get_exclusive(dev, "af_2v8");
 	if (IS_ERR(sensor->afvdd)) {
-		dev_warn(dev, "Failed to get regulator af_2v8\n");
+		cam_dbg("Failed to get regulator, guess sensor no need to control af_2v8\n");
 		sensor->afvdd = NULL;
 	}
 
 	sensor->avdd = devm_regulator_get_exclusive(dev, "avdd_2v8");
 	if (IS_ERR(sensor->avdd)) {
-		dev_warn(dev, "Failed to get regulator avdd_2v8\n");
+		cam_dbg("Failed to get regulator, guess sensor no need to control avdd_2v8\n");
 		sensor->avdd = NULL;
 	}
 
 	sensor->dovdd = devm_regulator_get_exclusive(dev, "dovdd_1v8");
 	if (IS_ERR(sensor->dovdd)) {
-		dev_warn(dev, "Failed to get regulator dovdd_1v8\n");
+		cam_dbg("Failed to get regulator, guess sensor no need to control dovdd_1v8\n");
 		sensor->dovdd = NULL;
 	}
 
 	sensor->dvdd = devm_regulator_get_exclusive(dev, "dvdd_1v2");
 	if (IS_ERR(sensor->dvdd)) {
-		dev_warn(dev, "Failed to get regulator dvdd_1v2\n");
+		cam_dbg("Failed to get regulator, guess sensor no need to control dvdd_1v2\n");
 		sensor->dvdd = NULL;
 	}
 
@@ -1406,6 +1422,7 @@ static int camsnr_of_parse(struct cam_sensor_device *sensor)
 			}
 		}
 	}
+	sensor->is_usedvdden = false;
 
 	sensor->dis_mclk = of_property_read_bool(of_node, "mclk-disable");
 	if (!sensor->dis_mclk) {
@@ -1431,6 +1448,7 @@ static int camsnr_of_parse(struct cam_sensor_device *sensor)
 				goto st_err;
 			}
 		} else {
+			cam_info("close soc mclk, guess sensor had mclk\n");
 			sensor->mclk = NULL;
 		}
 		/* pwdn-gpios */
