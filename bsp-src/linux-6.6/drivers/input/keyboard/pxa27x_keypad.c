@@ -25,6 +25,7 @@
 #include <linux/input/matrix_keypad.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/reset.h>
 
 #include <linux/platform_data/keypad-pxa27x.h>
 /*
@@ -86,6 +87,9 @@
 #define KPAS_CP(n)	((n) & 0xf)
 
 #define KPASMKP_MKC_MASK	(0xff)
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+#define KEYPAD_WAKE_CLEAR	BIT(3)
+#endif
 
 #define keypad_readl(off)	__raw_readl(keypad->mmio_base + (off))
 #define keypad_writel(off, v)	__raw_writel((v), keypad->mmio_base + (off))
@@ -97,8 +101,12 @@ struct pxa27x_keypad {
 	const struct pxa27x_keypad_platform_data *pdata;
 
 	struct clk *clk;
+	struct reset_control *resets;
 	struct input_dev *input_dev;
 	void __iomem *mmio_base;
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+	void __iomem *irq_base;
+#endif
 
 	int irq;
 
@@ -576,7 +584,11 @@ static irqreturn_t pxa27x_keypad_irq_handler(int irq, void *dev_id)
 {
 	struct pxa27x_keypad *keypad = dev_id;
 	unsigned long kpc = keypad_readl(KPC);
+#ifdef CONFIG_SOC_SPCAEMIT_K1X
+	unsigned int irq_mask = readl(keypad->irq_base);
 
+	writel(irq_mask | KEYPAD_WAKE_CLEAR, keypad->irq_base);
+#endif
 	clear_wakeup_event(keypad);
 
 	if (kpc & KPC_DI)
@@ -642,7 +654,8 @@ static int pxa27x_keypad_open(struct input_dev *dev)
 {
 	struct pxa27x_keypad *keypad = input_get_drvdata(dev);
 	int ret;
-	/* Enable unit clock */
+	/* Enable unit clock&reset */
+	reset_control_deassert(keypad->resets);
 	ret = clk_prepare_enable(keypad->clk);
 	if (ret)
 		return ret;
@@ -656,8 +669,9 @@ static void pxa27x_keypad_close(struct input_dev *dev)
 {
 	struct pxa27x_keypad *keypad = input_get_drvdata(dev);
 
-	/* Disable clock unit */
+	/* Disable clock&reset unit */
 	clk_disable_unprepare(keypad->clk);
+	reset_control_assert(keypad->resets);
 }
 
 static int pxa27x_keypad_suspend(struct device *dev)
@@ -743,11 +757,21 @@ static int pxa27x_keypad_probe(struct platform_device *pdev)
 	keypad->mmio_base = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(keypad->mmio_base))
 		return PTR_ERR(keypad->mmio_base);
-
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+	keypad->irq_base = devm_platform_ioremap_resource(pdev, 1);
+	if (IS_ERR(keypad->irq_base))
+		return PTR_ERR(keypad->irq_base);
+#endif
 	keypad->clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(keypad->clk)) {
 		dev_err(&pdev->dev, "failed to get keypad clock\n");
 		return PTR_ERR(keypad->clk);
+	}
+
+	keypad->resets = devm_reset_control_get_optional(&pdev->dev, NULL);
+	if(IS_ERR(keypad->resets)) {
+		dev_err(&pdev->dev, "failed to get keypad reset\n");
+		return PTR_ERR(keypad->resets);
 	}
 
 	input_dev->name = pdev->name;
