@@ -12,6 +12,7 @@
 #include <dt-bindings/dma/k1x-dmac.h>
 #include <dt-bindings/thermal/thermal.h>
 #include <dt-bindings/phy/phy.h>
+#include <dt-bindings/input/input.h>
 
 / {
 	compatible = "spacemit,k1-x";
@@ -2528,6 +2529,19 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			ranges = <0 0x0 0xf0702800 0x400>;
+			status = "disabled";
+		};
+
+		keypad: keypad@f0617000 {
+			compatible = "marvell,pxa27x-keypad";
+			reg = <0x0 0xf0617000 0x0 0x1000>,
+				<0x0 0xd428287c 0x0 0x4>;
+			interrupt-parent = <&intc>;
+			interrupts = <63>;
+			clocks = <&ccu CLK_SEC_KPC>;
+			clock-names = "kpc-clk";
+			resets = <&reset RESET_SEC_KPC>;
+			reset-names = "kpc-reset";
 			status = "disabled";
 		};
 
