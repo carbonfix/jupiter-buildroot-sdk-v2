@@ -20,6 +20,7 @@
 #include <linux/of_address.h>
 #include "phy-k1x-ci-usb2.h"
 
+
 static int mv_usb2_phy_init(struct usb_phy *phy)
 {
 	struct mv_usb2_phy *mv_phy = container_of(phy, struct mv_usb2_phy, phy);
@@ -39,7 +40,7 @@ static int mv_usb2_phy_init(struct usb_phy *phy)
 		if (temp & USB2_PHY_REG01_PLL_IS_READY)
 			break;
 		udelay(50);
-	} while(--loops);
+	} while (--loops);
 
 	if (loops == 0) {
 		pr_err("Wait PHY_REG01[PLLREADY] timeout\n");
@@ -55,7 +56,12 @@ static int mv_usb2_phy_init(struct usb_phy *phy)
 	temp |= USB2_ANALOG_HSDAC_ISEL_15_INC | USB2_ANALOG_HSDAC_IREG_EN;
 	writel(temp, base + USB2_ANALOG_REG14_13);
 
-	/* auto clear host disc*/
+	//select HS parallel data path
+	temp = readl(base + USB2_PHY_REG06);
+	temp &= ~(USB2_CFG_HS_SRC_SEL);
+	writel(temp, base + USB2_PHY_REG06);
+
+	/* for host mode auto clear */
 	temp = readl(base + USB2_PHY_REG04);
 	temp |= USB2_PHY_REG04_AUTO_CLEAR_DIS;
 	writel(temp, base + USB2_PHY_REG04);
@@ -87,6 +93,7 @@ static int mv_usb2_phy_connect_change(struct usb_phy *phy,
 {
 	struct mv_usb2_phy *mv_phy = container_of(phy, struct mv_usb2_phy, phy);
 	uint32_t reg;
+
 	if (!mv_phy->handle_connect_change)
 		return 0;
 	reg = readl(mv_phy->base + USB2_PHY_REG40);
@@ -100,7 +107,7 @@ static int mv_usb2_phy_probe(struct platform_device *pdev)
 	struct mv_usb2_phy *mv_phy;
 	struct resource *r;
 
-	dev_dbg(&pdev->dev, "k1x-ci-usb-phy-probe: Enter...\n");
+	dev_info(&pdev->dev, "phy-k1x-ci-usb2: will select HS parallel data path\n");
 	mv_phy = devm_kzalloc(&pdev->dev, sizeof(*mv_phy), GFP_KERNEL);
 	if (mv_phy == NULL) {
 		dev_err(&pdev->dev, "failed to allocate memory\n");
