@@ -164,6 +164,7 @@ asmlinkage __visible __trap_section void do_trap_insn_illegal(struct pt_regs *re
 	bool handled;
 #ifdef CONFIG_BIND_THREAD_TO_AICORES
 	u32 epc;
+	struct cpumask ai_affinity;
 #endif
 
 	if (user_mode(regs)) {
@@ -175,10 +176,17 @@ asmlinkage __visible __trap_section void do_trap_insn_illegal(struct pt_regs *re
 		if ((epc & AI_OPCODE_MASK0) == AI_OPCODE_MATCH0 ||
 			(epc & AI_OPCODE_MASK1) == AI_OPCODE_MATCH1) {
 			local_irq_enable();
-			sched_setaffinity(current->pid, &ai_cpu_mask);
+			if(!sched_getaffinity(0, &ai_affinity)) {
+				cpumask_and(&ai_affinity, &ai_affinity, &ai_cpu_mask);
+				if(cpumask_weight(&ai_affinity) &&
+					!sched_setaffinity(0, &ai_affinity)) {
+					/* try to bind ai core successed */
+					local_irq_disable();
+					irqentry_exit_to_user_mode(regs);
+					return;
+				}
+			}
 			local_irq_disable();
-			irqentry_exit_to_user_mode(regs);
-			return;
 		}
 #endif
 
