@@ -225,5 +225,8 @@
 #define CLK_RCPU2_PWM8      210
 #define CLK_RCPU2_PWM9      211
 
-#define CLK_MAX_NO      212
+#define CLK_AUDIO_APB       212
+#define CLK_AUDIO_AXI       213
+
+#define CLK_MAX_NO      214
 #endif /* _DT_BINDINGS_CLK_SPACEMIT_K1X_H_ */
