@@ -22,6 +22,7 @@ enum ccu_base_type{
 	BASE_TYPE_APBC2      = 8,
 	BASE_TYPE_RCPU       = 9,
 	BASE_TYPE_RCPU2      = 10,
+	BASE_TYPE_AUDPMU     = 11,
 };
 
 enum {
@@ -63,6 +64,7 @@ struct spacemit_k1x_clk {
 	void __iomem *apbc2_base;
 	void __iomem *rcpu_base;
 	void __iomem *rcpu2_base;
+	void __iomem *audpmu_base;
 };
 
 struct clk_hw_table {

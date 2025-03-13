@@ -278,7 +278,7 @@ unsigned long ccu_mix_calc_best_rate(struct clk_hw *hw, unsigned long rate, u32 
 	struct ccu_div_config *div = mix->div? mix->div: NULL;
 	struct clk_hw *parent;
 	unsigned long parent_rate = 0, best_rate = 0;
-	u32 i, j, div_max;
+	u32 i, j, d, div_max;
 
 	for (i = 0; i < common->num_parents; i++) {
 
@@ -292,7 +292,18 @@ unsigned long ccu_mix_calc_best_rate(struct clk_hw *hw, unsigned long rate, u32 
 		else
 			div_max = 1;
 
-		for(j = 1; j <= div_max; j++){
+		for (j = 1; j <= div_max; j++) {
+			if (div && div->flags & CLK_DIVIDER_POWER_OF_TWO) {
+				if (div->flags & CLK_DIVIDER_ALLOW_ZERO)
+					d = j - 1;
+				if (abs(parent_rate / BIT(d) - rate) < abs(best_rate - rate)) {
+					best_rate = DIV_ROUND_UP_ULL(parent_rate, BIT(d));
+					*mux_val = i;
+					*div_val = d;
+				}
+				continue;
+			}
+
 			if(abs(parent_rate/j - rate) < abs(best_rate - rate)){
 				best_rate = DIV_ROUND_UP_ULL(parent_rate, j);
 				*mux_val = i;

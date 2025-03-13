@@ -157,6 +157,22 @@ struct ccu_mix {
 		}							\
 	}
 
+#define SPACEMIT_CCU_DIV_FLAG(_struct, _name, _parent, _base_type, _reg,	\
+				_shift, _width, _div_flags, _flags) \
+	struct ccu_mix _struct = {					\
+		.div	= CCU_DIV_INIT(_shift, _width, NULL, _div_flags),	 \
+		.common = {\
+			.reg_ctrl		= _reg,				\
+			.base_type		= _base_type,		\
+			.name			= _name,	\
+			.num_parents	= 1,		\
+			.hw.init	= CLK_HW_INIT(_name,	\
+							_parent,		\
+							&ccu_mix_ops,		\
+							_flags | CLK_GET_RATE_NOCACHE),	\
+		}					\
+	}
+
 #define SPACEMIT_CCU_GATE_FACTOR(_struct, _name, _parent, _base_type, _reg,	\
 						  _gate_mask, _val_enable, _val_disable,  \
 						  _div, _mul, _flags) \

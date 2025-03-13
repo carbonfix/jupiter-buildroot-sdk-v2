@@ -209,6 +209,10 @@ DEFINE_SPINLOCK(g_cru_lock);
 #define RCPU2_PWM9_CLK_RST		0x24
 /* end of RCPU2 register offset */
 
+/* AUDPMU register offset */
+#define AUDPMU_AUDIO_BUS_CLK_CTRL	0x38
+/* end of AUDPMU register offset */
+
 struct spacemit_k1x_clk k1x_clock_controller;
 
 //apbs
@@ -1304,6 +1308,17 @@ static SPACEMIT_CCU_DIV_MUX_GATE(ruart1_clk, "ruart1_clk", ruart1_parent_names,
 	8, 11, 4, 2,
 	0x6, 0x6, 0x0,
 	0);
+
+static SPACEMIT_CCU_DIV_FLAG(audio_apb_clk, "audio_apb_clk", "audio_clk",
+	BASE_TYPE_AUDPMU, AUDPMU_AUDIO_BUS_CLK_CTRL,
+	4, 3, CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ALLOW_ZERO,
+	0);
+
+static SPACEMIT_CCU_DIV_FLAG(audio_axi_clk, "audio_axi_clk", "audio_clk",
+	BASE_TYPE_AUDPMU, AUDPMU_AUDIO_BUS_CLK_CTRL,
+	0, 2, CLK_DIVIDER_POWER_OF_TWO | CLK_DIVIDER_ALLOW_ZERO,
+	0);
+
 static struct clk_hw_onecell_data spacemit_k1x_hw_clks = {
 	.hws	= {
 		[CLK_PLL2]		= &pll2.common.hw,
@@ -1518,6 +1533,8 @@ static struct clk_hw_onecell_data spacemit_k1x_hw_clks = {
 		[CLK_RCPU2_PWM7] 	= &rpwm7_clk.common.hw,
 		[CLK_RCPU2_PWM8] 	= &rpwm8_clk.common.hw,
 		[CLK_RCPU2_PWM9] 	= &rpwm9_clk.common.hw,
+		[CLK_AUDIO_APB]		= &audio_apb_clk.common.hw,
+		[CLK_AUDIO_AXI]		= &audio_axi_clk.common.hw,
 	},
 	.num = CLK_MAX_NO,
 };
@@ -1614,6 +1631,9 @@ int ccu_common_init(struct clk_hw * hw, struct spacemit_k1x_clk *clk_info)
 		break;
 	case BASE_TYPE_RCPU2:
 		common->base = clk_info->rcpu2_base;
+		break;
+	case BASE_TYPE_AUDPMU:
+		common->base = clk_info->audpmu_base;
 		break;
 	default:
 		common->base = clk_info->apbc_base;
@@ -1737,6 +1757,12 @@ static void spacemit_k1x_ccu_probe(struct device_node *np)
 		clk_info->rcpu2_base = of_iomap(np, 9);
 		if (!clk_info->rcpu2_base) {
 			pr_err("failed to map rcpu2 registers\n");
+			goto out;
+		}
+
+		clk_info->audpmu_base = of_iomap(np, 10);
+		if (!clk_info->audpmu_base) {
+			pr_err("failed to map audpmu registers\n");
 			goto out;
 		}
 	} else {
