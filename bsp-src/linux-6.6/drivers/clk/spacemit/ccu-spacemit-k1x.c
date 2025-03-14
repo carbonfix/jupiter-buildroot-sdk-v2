@@ -1556,6 +1556,7 @@ static struct clk_hw_table bootup_enable_clk_table[] = {
 	{"pll2_d3", 	CLK_PLL2_D3},
 	{"apb_clk", 	CLK_APB},
 	{"pmua_aclk", 	CLK_PMUA_ACLK},
+	{"dma_clk",	CLK_DMA},
 };
 
 void spacemit_clocks_enable(struct clk_hw_table *tbl, int tbl_size)
