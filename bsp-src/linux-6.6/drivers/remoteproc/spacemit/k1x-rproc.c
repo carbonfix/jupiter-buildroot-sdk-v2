@@ -77,8 +77,9 @@ struct spacemit_mbox {
 
 struct spacemit_rproc {
 	struct device *dev;
+	unsigned int apb_clk_rate, apb_clk_rate_default;
 	struct reset_control *core_rst;
-	struct clk *core_clk;
+	struct clk *core_clk, *apb_clk;
 	unsigned int ddr_remap_base;
 	void __iomem *base[MAX_MEM_BASE];
 	struct spacemit_mbox *mb;
@@ -143,6 +144,11 @@ static int spacemit_rproc_prepare(struct rproc *rproc)
 
 	/* enable the power-switch and the clk */
 	pm_runtime_get_sync(priv->dev);
+
+	priv->apb_clk_rate_default = clk_get_rate(priv->apb_clk);
+
+	/* set apb clk rate */
+	clk_set_rate(priv->apb_clk, priv->apb_clk_rate);
 
 	/* Register associated reserved memory regions */
 	of_phandle_iterator_init(&it, np, "memory-region", NULL, 0);
@@ -438,6 +444,8 @@ static int rproc_platform_late(void)
 	/* wait the rcpu enter wfi */
 	mdelay(10);
 
+	clk_set_rate(srproc->apb_clk, srproc->apb_clk_rate_default);
+
 	genpd = pd_to_genpd(pdev->dev.pm_domain);
 
 	pdev->dev.power.wakeup_path = false;
@@ -467,7 +475,7 @@ static int rproc_platform_late(void)
 
 	/* close the clk & power-switch */
 	genpd->domain.ops.suspend_noirq(&pdev->dev);
-
+	
 	return 0;
 }
 
@@ -492,6 +500,9 @@ static void rproc_platfrom_wake(void)
 	genpd = pd_to_genpd(pdev->dev.pm_domain);
 	/* enable the clk & power-switch */
 	genpd->domain.ops.resume_noirq(&pdev->dev);
+
+	/* set apb clk rate */
+	clk_set_rate(srproc->apb_clk, srproc->apb_clk_rate);
 
 	/* enable ipc2ap clk & reset--> rcpu side */
 	writel(0xff, srproc->base[BOOTC_MEM_BASE_OFFSET] + ESOS_AON_PER_CLK_RST_CTL_REG);
@@ -665,6 +676,22 @@ static int spacemit_rproc_probe(struct platform_device *pdev)
 	if (IS_ERR(priv->core_clk)) {
 		ret = PTR_ERR(priv->core_clk);
 		dev_err(dev, "failed to acquire rpoc core\n");
+		ret = -EINVAL;
+		goto err_0;
+	}
+
+	priv->apb_clk = devm_clk_get(dev, "apb");
+	if (IS_ERR(priv->apb_clk)) {
+		ret = PTR_ERR(priv->apb_clk);
+		dev_err(dev, "failed to acquire rpoc apb clk\n");
+		ret = -EINVAL;
+		goto err_0;
+	}
+
+	/* get the apb clk rate */
+	ret = of_property_read_u32(np, "apb-clk-rate", &priv->apb_clk_rate);
+	if (ret) {
+		dev_err(dev, "failed to acquire rpoc apb clk rate\n");
 		ret = -EINVAL;
 		goto err_0;
 	}
