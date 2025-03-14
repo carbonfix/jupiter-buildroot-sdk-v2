@@ -988,8 +988,9 @@
 				<0 0xc0880000 0 0x200>;
 			ddr-remap-base = <0x30000000>;
 			esos-entry-point = <0x30300114>;
-			clocks = <&ccu CLK_AUDIO>;
-			clock-names = "core";
+			clocks = <&ccu CLK_AUDIO>, <&ccu CLK_AUDIO_APB>;
+			clock-names = "core", "apb";
+			apb-clk-rate = <122880000>;
 			resets = <&reset RESET_AUDIO_SYS>;
 			reset-names = "core_reset";
 			firmware-name = "esos.elf";
