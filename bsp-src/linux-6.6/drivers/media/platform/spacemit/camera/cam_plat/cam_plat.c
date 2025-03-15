@@ -263,28 +263,8 @@ EXPORT_SYMBOL(plat_cam_v4l2_device_get);
 
 int plat_cam_v4l2_device_put(struct v4l2_device *v4l2_dev)
 {
-#if 0
-	struct plat_cam_device *plat_cam_dev = to_plat_cam_dev(v4l2_dev);
-	struct platform_driver *plat_driver;
-
-	if (!v4l2_dev || !v4l2_dev->dev)
-		return -ENODEV;
-
-	plat_driver = to_platform_driver(v4l2_dev->dev->driver);
-
-	kref_put(&plat_cam_dev->ref, NULL);
-
-	if (kref_read(&plat_cam_dev->ref) == 1) {
-		plat_driver->remove = plat_cam_remove;
-		platform_driver_unregister(plat_driver);
-		kfree(plat_driver->driver.name);
-		kfree(plat_driver->driver.of_match_table);
-		kfree(plat_driver);
-	}
-#else
 	if (g_dev)
 		kref_put(&g_dev->ref, NULL);
-#endif
 	return 0;
 }
 

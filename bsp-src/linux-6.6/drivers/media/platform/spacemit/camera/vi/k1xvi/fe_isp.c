@@ -1174,9 +1174,7 @@ static int csi_subdev_video_s_stream(struct v4l2_subdev *sd, int enable)
 	else
 		csi2vc = CCIC_CSI2VC_VCDT;
 	if (enable) {
-#ifndef CONFIG_SPACEMIT_XILINX_ZYNQMP
 		csi_subdev_core_s_power(sd, 1);
-#endif
 		mipi_lane_num = csi->pad_fmts[CSI_PAD_IN].format.field & SPACEMIT_VI_PRI_DATA_MASK;
 		mipi_lane_num &= SPACEMIT_VI_MIPI_LANE_MASK;
 		cam_dbg("%s(%s) mipi lane num:%d", __func__, sc_subdev->name, mipi_lane_num);
@@ -4241,8 +4239,6 @@ static irqreturn_t fe_isp_dma_irq_handler(int irq, void *dev_id)
 	struct spm_camera_pipeline *sc_pipeline = NULL, *sc_pipelines[2] = {NULL, NULL};
 	struct media_pipeline *mpipe = NULL;
 	struct isp_pipeline_context *pipe_ctx = NULL;
-	struct fe_rawdump *rawdump = NULL;
-	struct media_pad *remote_pad = NULL;
 	struct frame_id *frame_id = NULL;
 	uint32_t frame_idx = 0;
 	struct spm_camera_vbuffer *pos = NULL;
@@ -4392,9 +4388,6 @@ static irqreturn_t fe_isp_dma_irq_handler(int irq, void *dev_id)
 					irq_status |= PIPE_ERR(1);
 				}
 			}
-			remote_pad = media_entity_remote_pad(&dma_ctx->vnode->pad);
-			BUG_ON(!remote_pad);
-			rawdump = media_entity_to_rawdump(remote_pad->entity);
 			if (irq_status) {
 				if (((irq_status & DMA_IRQ_START) && sc_pipeline && sc_pipeline->is_online_mode)
 					|| ((irq_status & DMA_IRQ_DONE) && sc_pipeline && !sc_pipeline->is_online_mode)) {
@@ -4468,14 +4461,6 @@ static irqreturn_t fe_isp_dma_irq_handler(int irq, void *dev_id)
 									pos->vb2_v4l2_buf.vb2_buf.timestamp = ktime_get_boottime_ns();
 								}
 								atomic_inc(&dma_ctx->busy_cnt);
-								if (rawdump && rawdump->rawdump_only) {
-									if (__spm_vdev_idle_list_empty(dma_ctx->vnode)) {
-										hw_isp_top_set_rdp_cfg_rdy(SC_BLOCK(isp_ctx->pipes[0]), rawdump->idx, 0);
-										hw_isp_top_set_rawdump_source(SC_BLOCK(isp_ctx->pipes[0]), rawdump->idx, INVALID_CH);
-										hw_isp_top_set_rdp_cfg_rdy(SC_BLOCK(isp_ctx->pipes[0]), rawdump->idx, 1);
-										pos->vb2_v4l2_buf.flags |= V4L2_BUF_FLAG_CLOSE_DOWN;
-									}
-								}
 							}
 						}
 					}
