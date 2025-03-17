@@ -15,6 +15,9 @@
 #define _FLEXCAN_H
 
 #include <linux/can/rx-offload.h>
+#include <linux/mailbox_controller.h>
+#include <linux/mailbox_client.h>
+#include <linux/sched.h>
 
 /* FLEXCAN hardware feature flags
  *
@@ -79,6 +82,16 @@ struct flexcan_stop_mode {
 	u8 req_bit;
 };
 
+struct flexcan_mox {
+	const char name[10];
+	struct mbox_chan *chan;
+	struct mbox_client client;
+	struct completion mb_comp;
+	struct task_struct *mb_thread;
+	bool kthread_running;
+	int box_id;
+};
+
 struct flexcan_priv {
 	struct can_priv can;
 	struct can_rx_offload offload;
@@ -113,6 +126,9 @@ struct flexcan_priv {
 	/* Read and Write APIs */
 	u32 (*read)(void __iomem *addr);
 	void (*write)(u32 val, void __iomem *addr);
+
+	/* can mailbox */
+	struct flexcan_mox *fmx;
 };
 
 extern const struct ethtool_ops flexcan_ethtool_ops;

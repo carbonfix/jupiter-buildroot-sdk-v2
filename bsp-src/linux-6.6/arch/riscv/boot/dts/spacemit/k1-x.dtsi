@@ -1853,7 +1853,6 @@
 			clocks = <&ccu CLK_RCPU_CAN>,<&ccu CLK_RCPU_CAN_BUS>;
 			clock-names = "per","ipg";
 			resets = <&reset RESET_RCPU_CAN>;
-			rcpu-can;
 			status = "disabled";
 		};
 
