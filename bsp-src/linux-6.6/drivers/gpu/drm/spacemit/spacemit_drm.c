@@ -260,7 +260,7 @@ static int spacemit_drm_bind(struct device *dev)
 	drm_kms_helper_poll_init(drm);
 
 	/* force detection after connectors init */
-	drm_helper_hpd_irq_event(drm);
+	// drm_helper_hpd_irq_event(drm);
 
 	err = drm_dev_register(drm, 0);
 	if (err < 0)
