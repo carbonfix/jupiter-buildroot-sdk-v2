@@ -74,7 +74,7 @@
 #define REBOOT_CMD_VALID	0x5
 
 static bool nowayout	= WATCHDOG_NOWAYOUT ? true : false;
-static spinlock_t reboot_lock;
+static DEFINE_SPINLOCK(reboot_lock);
 static DEFINE_MUTEX(wdt_clk_lock);
 
 phys_addr_t reboot_cmd_mem = 0;
