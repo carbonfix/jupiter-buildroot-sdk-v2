@@ -72,6 +72,9 @@ ifneq ($(KERNELRELEASE),)
 	    r8168-objs += r8168_dash.o
 		EXTRA_CFLAGS += -DENABLE_DASH_SUPPORT -DENABLE_DASH_PRINTER_SUPPORT
 	endif
+	ifdef CONFIG_LEDS_TRIGGER_NETDEV
+		r8168-objs += r8168_leds.o
+	endif
 	ifneq ($(ENABLE_RSS_SUPPORT), y)
 		EXTRA_CFLAGS += -DCONFIG_R8168_NAPI
 	endif

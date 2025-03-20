@@ -964,6 +964,46 @@ static inline struct mii_ioctl_data *if_mii(struct ifreq *rq)
 }
 #endif  //LINUX_VERSION_CODE < KERNEL_VERSION(2,6,7)
 
+int rtl8168_led_mod_ctrl(struct rtl8168_private *tp, u16 mask, u16 val)
+{
+	mutex_lock(&tp->led_lock);
+	RTL_W16(tp, CustomLED, (RTL_R16(tp, CustomLED) & ~mask) | val);
+	mutex_unlock(&tp->led_lock);
+
+	return 0;
+}
+
+int rtl8168_get_led_mode(struct rtl8168_private *tp)
+{
+	int ret;
+
+	ret = RTL_R16(tp, CustomLED);
+
+	return ret;
+}
+
+void r8168_get_led_name(struct rtl8168_private *tp, int idx,
+			char *buf, int buf_len)
+{
+	struct pci_dev *pdev = tp->pci_dev;
+	char pdom[8], pfun[8];
+	int domain;
+
+	domain = pci_domain_nr(pdev->bus);
+	if (domain)
+		snprintf(pdom, sizeof(pdom), "P%d", domain);
+	else
+		pdom[0] = '\0';
+
+	if (pdev->multifunction)
+		snprintf(pfun, sizeof(pfun), "f%d", PCI_FUNC(pdev->devfn));
+	else
+		pfun[0] = '\0';
+
+	snprintf(buf, buf_len, "en%sp%ds%d%s-%d::lan", pdom, pdev->bus->number,
+		 PCI_SLOT(pdev->devfn), pfun, idx);
+}
+
 int rtl8168_dump_tally_counter(struct rtl8168_private *tp, dma_addr_t paddr)
 {
         u32 cmd;
@@ -28827,6 +28867,11 @@ rtl8168_init_one(struct pci_dev *pdev,
 
         printk(KERN_INFO "%s: This product is covered by one or more of the following patents: US6,570,884, US6,115,776, and US6,327,625.\n", MODULENAME);
 
+        mutex_init(&tp->led_lock);
+#if IS_REACHABLE(CONFIG_LEDS_CLASS) && IS_ENABLED(CONFIG_LEDS_TRIGGER_NETDEV)
+        tp->leds = rtl8168_init_leds(dev);
+#endif
+
         rtl8168_disable_rxdvgate(dev);
 
         device_set_wakeup_enable(&pdev->dev, tp->wol_enabled);
@@ -28901,6 +28946,10 @@ rtl8168_remove_one(struct pci_dev *pdev)
 #ifdef ENABLE_R8168_SYSFS
         rtl8168_sysfs_remove(dev);
 #endif //ENABLE_R8168_SYSFS
+
+#if IS_REACHABLE(CONFIG_LEDS_CLASS) && IS_ENABLED(CONFIG_LEDS_TRIGGER_NETDEV)
+        r8168_remove_leds(tp->leds);
+#endif
 
         unregister_netdev(dev);
         rtl8168_disable_msi(pdev, tp);

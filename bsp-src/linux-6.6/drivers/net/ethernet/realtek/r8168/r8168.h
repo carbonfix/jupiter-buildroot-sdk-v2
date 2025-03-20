@@ -2000,6 +2000,7 @@ struct ethtool_eee {
 };
 #endif /* LINUX_VERSION_CODE < KERNEL_VERSION(3,6,0) */
 
+struct r8168_led_classdev;
 struct rtl8168_private {
         void __iomem *mmio_addr;    /* memory map physical address */
         struct pci_dev *pci_dev;    /* Index of PCI device */
@@ -2285,6 +2286,9 @@ struct rtl8168_private {
         u32 rss_options;
 #endif
         u32 rx_fifo_of; /* Rx fifo overflow count */
+
+        struct mutex led_lock;	/* serialize LED ctrl RMW access */
+        struct r8168_led_classdev *leds;
 };
 
 #ifdef ENABLE_LIB_SUPPORT
@@ -2620,6 +2624,13 @@ int rtl8168_init_ring(struct net_device *dev);
 int rtl8168_dump_tally_counter(struct rtl8168_private *tp, dma_addr_t paddr);
 void rtl8168_enable_napi(struct rtl8168_private *tp);
 void _rtl8168_wait_for_quiescence(struct net_device *dev);
+
+void r8168_get_led_name(struct rtl8168_private *tp, int idx,
+			char *buf, int buf_len);
+int rtl8168_get_led_mode(struct rtl8168_private *tp);
+int rtl8168_led_mod_ctrl(struct rtl8168_private *tp, u16 mask, u16 val);
+struct r8168_led_classdev *rtl8168_init_leds(struct net_device *ndev);
+void r8168_remove_leds(struct r8168_led_classdev *leds);
 
 #ifndef ENABLE_LIB_SUPPORT
 static inline void rtl8168_lib_reset_prepare(struct rtl8168_private *tp) { }
