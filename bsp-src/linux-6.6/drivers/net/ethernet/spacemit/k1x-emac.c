@@ -2837,7 +2837,6 @@ static int emac_probe(struct platform_device *pdev)
 	}
 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 
-	device_enable_async_suspend(&pdev->dev);
 	netif_napi_add(ndev, &priv->napi, emac_rx_poll);
 
 	return 0;
@@ -2944,7 +2943,7 @@ static int emac_suspend(struct device *dev)
 #endif
 
 static const struct dev_pm_ops k1x_emac_pm_qos = {
-	NOIRQ_SYSTEM_SLEEP_PM_OPS(emac_suspend, emac_resume)
+	SET_SYSTEM_SLEEP_PM_OPS(emac_suspend, emac_resume)
 };
 
 static const struct of_device_id emac_of_match[] = {
