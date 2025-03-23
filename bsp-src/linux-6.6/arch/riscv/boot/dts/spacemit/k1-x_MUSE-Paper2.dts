@@ -1029,6 +1029,7 @@
 		snps,dis-tx-ipgap-linecheck-quirk;
 		snps,parkmode-disable-ss-quirk;
 
+		monitor-vbus;
 		usb-role-switch;
 		role-switch-default-mode = "peripheral";
 		ports {
