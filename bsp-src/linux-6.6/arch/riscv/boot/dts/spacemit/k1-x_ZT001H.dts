@@ -720,11 +720,12 @@
 &ehci {
 	spacemit,reset-on-resume;
 	spacemit,udc-mode = <MV_USB_MODE_OTG>;
-	status = "okay";
+	status = "disabled";
 };
 
 &udc {
-	spacemit,udc-mode = <MV_USB_MODE_OTG>;
+	spacemit,udc-mode = <MV_USB_MODE_UDC>;
+	monitor-vbus-with-psy = <&sgm4154x>;
 	status = "okay";
 };
 
@@ -733,7 +734,7 @@
 	usb-role-switch;
 	role-switch-user-control;
 	spacemit,reset-on-resume;
-	status = "okay";
+	status = "disabled";
 
 	usb-role-switch;
 	role-switch-default-mode = "peripheral";
