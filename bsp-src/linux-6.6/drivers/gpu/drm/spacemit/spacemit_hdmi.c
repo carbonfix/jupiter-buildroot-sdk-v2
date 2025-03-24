@@ -759,10 +759,16 @@ spacemit_hdmi_connector_detect(struct drm_connector *connector, bool force)
 	}
 
 	if (hdmi_get_plug_in_status(hdmi)) {
-		DRM_INFO("%s() hdmi status connected\n", __func__);
-		spacemit_hdmi_notifier_call_chain(DRM_HDMI_EVENT_CONNECTED, "status");
-		status = connector_status_connected;
-
+		mdelay(2);
+		if (hdmi_get_plug_in_status(hdmi)) {
+			DRM_INFO("%s() hdmi status connected\n", __func__);
+			spacemit_hdmi_notifier_call_chain(DRM_HDMI_EVENT_CONNECTED, "status");
+			status = connector_status_connected;
+		} else {
+			DRM_INFO("%s() hdmi status disconnected\n", __func__);
+			spacemit_hdmi_notifier_call_chain(DRM_HDMI_EVENT_DISCONNECTED, "status");
+			status = connector_status_disconnected;
+		}
 	} else {
 		DRM_INFO("%s() hdmi status disconnected\n", __func__);
 		spacemit_hdmi_notifier_call_chain(DRM_HDMI_EVENT_DISCONNECTED, "status");
