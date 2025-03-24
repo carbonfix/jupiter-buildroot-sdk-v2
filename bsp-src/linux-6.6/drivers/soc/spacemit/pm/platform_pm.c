@@ -98,6 +98,11 @@ static int spacemit_system_suspend(unsigned long sleep_type,
 {
 	struct sbiret ret;
 
+#if defined(CONFIG_SOC_SPACEMIT_K1X)
+	/* flush the local cache */
+	sbi_flush_local_dcache_all();
+#endif
+
 	ret = sbi_ecall(SBI_EXT_SUSP, SBI_EXT_SUSP_SYSTEM_SUSPEND,
 			sleep_type, resume_addr, opaque, 0, 0, 0);
 	if (ret.error)
