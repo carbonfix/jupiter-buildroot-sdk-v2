@@ -1645,7 +1645,7 @@ udc_prime_status(struct mv_udc *udc, u8 direction, u16 status, bool empty)
 				"Failed to queue dtd when prime status\n");
 			goto out;
 		}
-	} else{	/* no mem */
+	} else {	/* no mem */
 		retval = -ENOMEM;
 		dev_err(&udc->dev->dev,
 			"Failed to dma_pool_alloc when prime status\n");
@@ -1942,7 +1942,7 @@ static int  ep0_req_complete(struct mv_udc *udc,
 		break;
 	case DATA_STATE_RECV:
 		/* send status phase */
-		if (udc_prime_status(udc, EP_DIR_IN, 0 , true))
+		if (udc_prime_status(udc, EP_DIR_IN, 0, true))
 			ep0_stall(udc);
 		break;
 	case WAIT_FOR_OUT_STATUS:
@@ -2273,6 +2273,45 @@ static void mv_udc_vbus_work(struct work_struct *work)
 	mv_udc_vbus_session(&udc->gadget, vbus);
 }
 
+static int mv_udc_vbus_psy_notifier_call(struct notifier_block *nb,
+					unsigned long val, void *v)
+{
+	struct mv_udc *udc = container_of(nb, struct mv_udc, notifier);
+
+	struct power_supply *psy = v;
+
+	pr_debug("mv_udc_vbus_psy_notifier_call : udc->vbus_work\n");
+	if (val == PSY_EVENT_PROP_CHANGED && psy == udc->vbus_psy && udc->qwork) {
+		queue_work(udc->qwork, &udc->vbus_work);
+	}
+
+	return NOTIFY_OK;
+}
+
+static int mv_udc_query_vbus_psy(struct mv_udc *udc)
+{
+	union power_supply_propval val;
+	unsigned int ret, vbus = 0;
+
+	ret = power_supply_get_property(udc->vbus_psy,
+					  POWER_SUPPLY_PROP_PRESENT, &val);
+	if (ret == 0)
+		vbus = val.intval;
+	return vbus;
+}
+
+static void mv_udc_vbus_psy_work(struct work_struct *work)
+{
+	struct mv_udc *udc;
+	unsigned int vbus = 0;
+
+	udc = container_of(work, struct mv_udc, vbus_work);
+	vbus = mv_udc_query_vbus_psy(udc);
+	pr_debug("mv_udc_vbus_psy_work : udc->vbus_psy return: %d\n", vbus);
+
+	mv_udc_vbus_session(&udc->gadget, vbus);
+}
+
 /* release device structure */
 static void gadget_release(struct device *_dev)
 {
@@ -2383,7 +2422,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 				dev_err(&pdev->dev, "couldn't get extcon device\n");
 				return -EPROBE_DEFER;
 			}
-			dev_info(&pdev->dev,"extcon_dev name: %s \n", extcon_get_edev_name(udc->extcon));
+			dev_info(&pdev->dev, "extcon_dev name: %s \n", extcon_get_edev_name(udc->extcon));
 		} else {
 			dev_err(&pdev->dev, "usb extcon cable is not exist\n");
 			return -EINVAL;
@@ -2444,7 +2483,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	dev_info(&pdev->dev, " use 32bit DMA mask\n");
 	dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(32));
 
-	size = udc->max_eps * sizeof(struct mv_dqh) *2;
+	size = udc->max_eps * sizeof(struct mv_dqh) * 2;
 	size = (size + DQH_ALIGNMENT - 1) & ~(DQH_ALIGNMENT - 1);
 	udc->ep_dqh = dma_alloc_coherent(&pdev->dev, size,
 					&udc->ep_dqh_dma, GFP_KERNEL);
@@ -2468,7 +2507,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 		goto err_free_dma;
 	}
 
-	size = udc->max_eps * sizeof(struct mv_ep) *2;
+	size = udc->max_eps * sizeof(struct mv_ep) * 2;
 	udc->eps = devm_kzalloc(&pdev->dev, size, GFP_KERNEL);
 	if (udc->eps == NULL) {
 		dev_err(&pdev->dev, "allocate ep memory failed\n");
@@ -2540,6 +2579,34 @@ static int mv_udc_probe(struct platform_device *pdev)
 		}
 
 		INIT_WORK(&udc->vbus_work, mv_udc_vbus_work);
+	}
+
+	if (!udc->extcon && of_property_read_bool(np, "monitor-vbus-with-psy")) {
+		udc->vbus_psy = devm_power_supply_get_by_phandle(&pdev->dev, "monitor-vbus-with-psy");
+		if (IS_ERR(udc->vbus_psy)) {
+			dev_err(&pdev->dev, "Couldn't get the VBUS power supply for vbus detection\n");
+			return PTR_ERR(udc->vbus_psy);
+		} else if (!udc->vbus_psy) {
+			return -EPROBE_DEFER;
+		}
+
+		udc->notifier.notifier_call = mv_udc_vbus_psy_notifier_call;
+		udc->notifier.priority = 0;
+
+		retval = power_supply_reg_notifier(&udc->notifier);
+		if (retval)
+			return retval;
+
+		udc->vbus_active = mv_udc_query_vbus_psy(udc);
+
+		udc->qwork = create_singlethread_workqueue("mv_udc_queue");
+		if (!udc->qwork) {
+			dev_err(&pdev->dev, "cannot create workqueue\n");
+			retval = -ENOMEM;
+			goto err_create_workqueue;
+		}
+
+		INIT_WORK(&udc->vbus_work, mv_udc_vbus_psy_work);
 	}
 
 	 /*

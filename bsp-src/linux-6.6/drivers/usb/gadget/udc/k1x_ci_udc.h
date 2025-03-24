@@ -247,6 +247,7 @@ struct mv_udc {
 	/* for vbus detection */
 	struct extcon_specific_cable_nb vbus_dev;
 	struct extcon_dev *extcon;
+	struct power_supply *vbus_psy;
 };
 
 /* endpoint data structure */
