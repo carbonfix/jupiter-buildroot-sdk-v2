@@ -685,6 +685,8 @@ static void spacemit_sdhci_set_clock(struct sdhci_host *host, unsigned int clock
 		}
 	}
 
+	sdhci_set_clock(host, clock);
+
 	if (host->mmc->caps2 & MMC_CAP2_NO_MMC) {
 		/*
 		* according to the SD spec, during a signal voltage level switch,
@@ -697,11 +699,14 @@ static void spacemit_sdhci_set_clock(struct sdhci_host *host, unsigned int clock
 		cmd = SDHCI_GET_CMD(sdhci_readw(host, SDHCI_COMMAND));
 		if ((cmd == SD_SWITCH_VOLTAGE) && (host->mmc->ios.signal_voltage == MMC_SIGNAL_VOLTAGE_180)) {
 			/* disable auto clock */
-			spacemit_sdhci_set_clk_gate(host, 0);
+			if (clock)
+				/*
+				 * some sdio device's signal level is already 1.8V before voltage switch,
+				 * so we should avoid generating clock multiple times during switch sequence.
+				 */
+				spacemit_sdhci_set_clk_gate(host, 0);
 		}
 	}
-
-	sdhci_set_clock(host, clock);
 };
 
 static void spacemit_sdhci_phy_dll_init(struct sdhci_host *host)
