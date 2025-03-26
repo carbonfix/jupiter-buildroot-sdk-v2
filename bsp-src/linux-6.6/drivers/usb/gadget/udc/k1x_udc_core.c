@@ -38,6 +38,7 @@
 #include <linux/reset.h>
 #include <linux/extcon.h>
 #include <linux/extcon-provider.h>
+#include <linux/debugfs.h>
 
 #include "k1x_ci_udc.h"
 
@@ -78,6 +79,158 @@ static const struct usb_endpoint_descriptor mv_ep0_desc = {
 	.bmAttributes =		USB_ENDPOINT_XFER_CONTROL,
 	.wMaxPacketSize =	EP0_MAX_PKT_SIZE,
 };
+
+/* Debugfs functions */
+
+static int print_dtd(struct mv_udc *udc, int index, struct mv_req *curr_req,
+		     struct seq_file *s)
+{
+	struct mv_dtd *curr_dtd;
+	u32 cache_cur_dtd;
+	struct mv_dqh *curr_dqh;
+	int actual;
+	int i, direction;
+	u32 errors;
+	const char *pos;
+
+	curr_dqh = &udc->ep_dqh[index];
+	direction = index % 2;
+	cache_cur_dtd = curr_dqh->curr_dtd_ptr;
+	curr_dtd = curr_req->head;
+	actual = curr_req->req.actual;
+
+	seq_printf(
+		s,
+		" req 0x%llx len: %d hdrdtd: 0x%llx taildtd: 0x%llx dtd_count: %d actual: %d\n ",
+		*(uint64_t *)&curr_req, curr_req->req.length,
+		*(u64 *)&(curr_req->head->td_dma),
+		*(u64 *)&(curr_req->tail->td_dma), curr_req->dtd_count, actual);
+
+	for (i = 0; i < curr_req->dtd_count; i++) {
+		pos = "---";
+		if (cache_cur_dtd ==
+		    (curr_dtd->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK))
+			pos = "cur";
+		if (curr_dqh->next_dtd_ptr ==
+		    (curr_dtd->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK))
+			pos = "nxt";
+		errors = curr_dtd->size_ioc_sts & DTD_ERROR_MASK;
+		seq_printf(s, "  [%s]dtd dma 0x%llx size_ioc_sts: 0x%x err: 0x%x dtd_nxt: 0x%x\n",
+			pos, *(uint64_t *)&(curr_dtd->td_dma),
+			curr_dtd->size_ioc_sts, errors, curr_dtd->dtd_next);
+		seq_printf(s, "   buf p0:0x%x p1:0x%x p2:0x%x p3:0x%x p4:0x%x scr: 0x%x\n",
+			curr_dtd->buff_ptr0, curr_dtd->buff_ptr1,
+			curr_dtd->buff_ptr2, curr_dtd->buff_ptr3,
+			curr_dtd->buff_ptr4, curr_dtd->scratch_ptr);
+		if (i != curr_req->dtd_count - 1)
+			curr_dtd = (struct mv_dtd *)curr_dtd->next_dtd_virt;
+	}
+	return 0;
+}
+
+int mv_udc_dtd_queue_show(struct seq_file *s, void *unused)
+{
+	struct mv_udc *udc = s->private;
+	unsigned long flags;
+
+	u32 bit_pos;
+	int i, ep_num = 0, direction = 0;
+	struct mv_ep *curr_ep;
+	struct mv_req *curr_req, *temp_req;
+	struct mv_dqh cache_dqh;
+
+	spin_lock_irqsave(&udc->lock, flags);
+	if (!udc->driver) {
+		seq_puts(s, "udc not started yet\n");
+		spin_unlock_irqrestore(&udc->lock, flags);
+		return 0;
+	}
+
+	for (i = 0; i < udc->max_eps * 2; i++) {
+		ep_num = i >> 1;
+		direction = i % 2;
+		bit_pos = 1 << (((direction == EP_DIR_OUT) ? 0 : 16) + ep_num);
+
+		if (i == 1)
+			curr_ep = &udc->eps[0];
+		else
+			curr_ep = &udc->eps[i];
+
+		if (!curr_ep->dqh->max_packet_length)
+			continue;
+		seq_printf(s, "\nThis is ep num: %d dir: %d(%s)\n", ep_num,
+			   direction, direction == EP_DIR_OUT ? "out" : "in");
+		seq_printf(s, "\nThis ep bit pos: 0x%x\n", bit_pos);
+		cache_dqh = udc->ep_dqh[i];
+		seq_printf(s, " dqh(0x%x) of current ep: %d dir: %d(%s)\n",
+				((u32)(udc->ep_dqh_dma) + (u32)sizeof(struct mv_dqh) * i), ep_num,
+			   direction, direction == EP_DIR_OUT ? "out" : "in");
+		seq_printf(s, " dqh maxpacklen: 0x%x size_ioc_int_sts: 0x%x\n",
+			   cache_dqh.max_packet_length,
+			   cache_dqh.size_ioc_int_sts);
+		seq_printf(s, "  dqh td_dma curr_dtd_ptr: 0x%08x next_dtd_ptr: 0x%x\n",
+			cache_dqh.curr_dtd_ptr, cache_dqh.next_dtd_ptr);
+		seq_printf(s, "  dqh buf p0: 0x%x p1: 0x%x p2: 0x%x p3: 0x%x p4: 0x%x\n",
+			cache_dqh.buff_ptr0, cache_dqh.buff_ptr1,
+			cache_dqh.buff_ptr2, cache_dqh.buff_ptr3,
+			cache_dqh.buff_ptr4);
+		list_for_each_entry_safe(curr_req, temp_req, &curr_ep->queue,
+					 queue) {
+			print_dtd(udc, i, curr_req, s);
+		}
+	}
+	spin_unlock_irqrestore(&udc->lock, flags);
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(mv_udc_dtd_queue);
+
+int mv_udc_registers_show(struct seq_file *s, void *unused)
+{
+	struct mv_udc *udc = s->private;
+	unsigned long flags;
+
+	spin_lock_irqsave(&udc->lock, flags);
+	seq_printf(s, "usbcmd: 0x%08x\n", readl(&udc->op_regs->usbcmd));
+	seq_printf(s, "usbsts: 0x%08x\n", readl(&udc->op_regs->usbsts));
+	seq_printf(s, "usbintr: 0x%08x\n", readl(&udc->op_regs->usbintr));
+	seq_printf(s, "frindex: 0x%08x\n", readl(&udc->op_regs->frindex));
+	seq_printf(s, "deviceaddr: 0x%08x\n", readl(&udc->op_regs->deviceaddr));
+	seq_printf(s, "eplistaddr: 0x%08x\n", readl(&udc->op_regs->eplistaddr));
+	seq_printf(s, "ttctrl: 0x%08x\n", readl(&udc->op_regs->ttctrl));
+	seq_printf(s, "burstsize: 0x%08x\n", readl(&udc->op_regs->burstsize));
+	seq_printf(s, "txfilltuning: 0x%08x\n", readl(&udc->op_regs->txfilltuning));
+	seq_printf(s, "epnak: 0x%08x\n", readl(&udc->op_regs->epnak));
+	seq_printf(s, "epnaken: 0x%08x\n", readl(&udc->op_regs->epnaken));
+	seq_printf(s, "configflag: 0x%08x\n", readl(&udc->op_regs->configflag));
+	seq_printf(s, "portsc: 0x%08x\n", readl(&udc->op_regs->portsc));
+	seq_printf(s, "otgsc: 0x%08x\n", readl(&udc->op_regs->otgsc));
+	seq_printf(s, "usbmode: 0x%08x\n", readl(&udc->op_regs->usbmode));
+	seq_printf(s, "epsetupstat: 0x%08x\n", readl(&udc->op_regs->epsetupstat));
+	seq_printf(s, "epprime: 0x%08x\n", readl(&udc->op_regs->epprime));
+	seq_printf(s, "epflush: 0x%08x\n", readl(&udc->op_regs->epflush));
+	seq_printf(s, "epstatus: 0x%08x\n", readl(&udc->op_regs->epstatus));
+	seq_printf(s, "epcomplete: 0x%08x\n", readl(&udc->op_regs->epcomplete));
+	seq_printf(s, "epctrlx[0]: 0x%08x\n", readl(&udc->op_regs->epctrlx[0]));
+	seq_printf(s, "epctrlx[1]: 0x%08x\n", readl(&udc->op_regs->epctrlx[1]));
+	seq_printf(s, "epctrlx[2]: 0x%08x\n", readl(&udc->op_regs->epctrlx[2]));
+	seq_printf(s, "epctrlx[3]: 0x%08x\n", readl(&udc->op_regs->epctrlx[3]));
+	spin_unlock_irqrestore(&udc->lock, flags);
+
+	return 0;
+}
+DEFINE_SHOW_ATTRIBUTE(mv_udc_registers);
+
+static void mv_udc_debugfs_init(struct mv_udc *udc)
+{
+	struct dentry *root;
+
+	root = debugfs_create_dir(kobject_name(&udc->dev->dev.kobj),
+				  usb_debug_root);
+	debugfs_create_file("req_queue", 0400, root, udc,
+			    &mv_udc_dtd_queue_fops);
+	debugfs_create_file("registers", 0400, root, udc,
+			    &mv_udc_registers_fops);
+}
 
 static void ep0_reset(struct mv_udc *udc)
 {
@@ -2329,6 +2482,8 @@ static int mv_udc_remove(struct platform_device *pdev)
 	device_init_wakeup(&pdev->dev, 0);
 	udc = platform_get_drvdata(pdev);
 
+	debugfs_remove(debugfs_lookup(kobject_name(&udc->dev->dev.kobj), usb_debug_root));
+
 	usb_del_gadget_udc(&udc->gadget);
 
 	if (udc->qwork) {
@@ -2638,7 +2793,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 			return retval;
 		}
 	}
-
+	mv_udc_debugfs_init(udc);
 	dev_info(&pdev->dev, "successful probe UDC device %s clock gating.\n",
 		udc->clock_gating ? "with" : "without");
 
