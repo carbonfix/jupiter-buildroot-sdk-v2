@@ -503,7 +503,8 @@ static int queue_dtd(struct mv_ep *ep, struct mv_req *req)
 	struct mv_req *curr_req, *temp_req;
 	u32 find_missing_dtd = 0;
 	u32 bit_pos, direction;
-	u32 epstatus;
+	u32 usbcmd, epstatus;
+	unsigned int loops;
 	int retval = 0;
 
 	udc = ep->udc;
@@ -514,23 +515,60 @@ static int queue_dtd(struct mv_ep *ep, struct mv_req *req)
 	/* check if the pipe is empty */
 	if (!(list_empty(&ep->queue))) {
 		struct mv_req *lastreq;
+
 		lastreq = list_entry(ep->queue.prev, struct mv_req, queue);
 		lastreq->tail->dtd_next =
 			req->head->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK;
 
+		/* Ensure HW sees dqh update before priming. */
 		wmb();
 
 		if (readl(&udc->op_regs->epprime) & bit_pos)
 			goto done;
 
-		epstatus = readl(&udc->op_regs->epstatus) & bit_pos;
+		loops = LOOPS(READSAFE_TIMEOUT);
+		while (1) {
+			/* start with setting the semaphores */
+			usbcmd = readl(&udc->op_regs->usbcmd);
+			usbcmd |= USBCMD_ATDTW_TRIPWIRE_SET;
+			writel(usbcmd, &udc->op_regs->usbcmd);
+
+			/* read the endpoint status */
+			epstatus = readl(&udc->op_regs->epstatus) & bit_pos;
+
+			/*
+			 * Reread the ATDTW semaphore bit to check if it is
+			 * cleared. When hardware see a hazard, it will clear
+			 * the bit or else we remain set to 1 and we can
+			 * proceed with priming of endpoint if not already
+			 * primed.
+			 */
+			if (readl(&udc->op_regs->usbcmd)
+				& USBCMD_ATDTW_TRIPWIRE_SET)
+				break;
+
+			loops--;
+			if (loops == 0) {
+				dev_err(&udc->dev->dev,
+					"Timeout for ATDTW_TRIPWIRE...\n");
+				retval = -ETIME;
+				goto done;
+			}
+			udelay(LOOPS_USEC);
+		}
+
+		/* Clear the semaphore */
+		usbcmd = readl(&udc->op_regs->usbcmd);
+		usbcmd &= USBCMD_ATDTW_TRIPWIRE_CLEAR;
+		writel(usbcmd, &udc->op_regs->usbcmd);
+
 		if (epstatus)
 			goto done;
 
 		/* Check if there are missing dTD in the queue not primed */
 		list_for_each_entry_safe(curr_req, temp_req, &ep->queue, queue)
 			if (curr_req->head->size_ioc_sts & DTD_STATUS_ACTIVE) {
-				pr_info("There are missing dTD need to be primed!\n");
+				dev_dbg(&udc->dev->dev, "There are missing dTD need to be primed!\n");
 				find_missing_dtd = 1;
 				break;
 			}
@@ -547,11 +585,12 @@ static int queue_dtd(struct mv_ep *ep, struct mv_req *req)
 	/* clear active and halt bit, in case set from a previous error */
 	dqh->size_ioc_int_sts &= ~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED);
 
-	/* Ensure that updates to the QH will occure before priming. */
+	/* Ensure that updates to the QH will occur before priming. */
 	wmb();
 
 	/* Prime the Endpoint */
 	hw_ep_prime(udc, bit_pos);
+
 done:
 	return retval;
 }
