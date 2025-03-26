@@ -295,7 +295,7 @@ static int hw_ep_prime(struct mv_udc *udc, u32 bit_pos)
 		cpu_relax();
 		prime_times++;
 		if (prime_times > MAX_EPPRIME_TIMES) {
-			dev_err(&udc->dev->dev, "epprime out of time\n");
+			dev_err(&udc->dev->dev, "epprime out of time, bit_pos: %x\n", bit_pos);
 			return -1;
 		}
 	}
@@ -336,7 +336,7 @@ static int process_ep_req(struct mv_udc *udc, int index,
 
 			if (remaining_length) {
 				if (direction) {
-					dev_dbg(&udc->dev->dev,
+					dev_err(&udc->dev->dev,
 						"TX dTD remains data\n");
 					retval = -EPROTO;
 					break;
@@ -390,6 +390,7 @@ static int process_ep_req(struct mv_udc *udc, int index,
 
 				hw_ep_prime(udc, bit_pos);
 
+				dev_info(&udc->dev->dev, "reprime during %s\n", __func__);
 				break;
 			}
 		}
@@ -421,7 +422,7 @@ static int done(struct mv_ep *ep, struct mv_req *req, int status)
 	list_del_init(&req->queue);
 
 	if (req->req.dma == DMA_ADDR_INVALID && req->mapped == 0) {
-		dev_info(&udc->dev->dev, "%s request %p already unmapped",
+		dev_err(&udc->dev->dev, "%s request %p already unmapped",
 					ep->name, req);
 		WARN_ON_ONCE(1);
 		return -ESHUTDOWN;
@@ -471,13 +472,14 @@ static int done(struct mv_ep *ep, struct mv_req *req, int status)
 			if (curr_req->head->size_ioc_sts & DTD_STATUS_ACTIVE) {
 				dqh->next_dtd_ptr = curr_req->head->td_dma & EP_QUEUE_HEAD_NEXT_POINTER_MASK;
 				dqh->size_ioc_int_sts &= ~(DTD_STATUS_ACTIVE | DTD_STATUS_HALTED);
+				/* Ensure HW sees dqh update before priming. */
 				wmb();
 				hw_ep_prime(udc, bit_pos);
-				pr_debug("done: prime ep again: ENDPTSTAT = 0x%x\n", readl(&udc->op_regs->epstatus) & bit_pos);
+				dev_dbg(&udc->dev->dev, "done: prime ep again: ENDPTSTAT = 0x%x\n",
+					  readl(&udc->op_regs->epstatus) & bit_pos);
 				break;
 			}
 	}
-
 	spin_unlock(&ep->udc->lock);
 
 skip_prime_again:
@@ -596,7 +598,7 @@ done:
 	return retval;
 }
 
-static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
+static struct mv_dtd *build_dtd(struct mv_req *req, unsigned int *length,
 		dma_addr_t *dma, int *is_last)
 {
 	struct mv_dtd *dtd;
@@ -611,33 +613,33 @@ static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
 		mult = (dqh->max_packet_length >> EP_QUEUE_HEAD_MULT_POS)
 				& 0x3;
 		*length = min(req->req.length - req->req.actual,
-				(unsigned)(mult * max));
+				(unsigned int)(mult * max));
 		/*
-		* USB Specification 2.0 Section 5.9.2 states that: "If
-		* there is only a single transaction in the microframe,
-		* only a DATA0 data packet PID is used.  If there are
-		* two transactions per microframe, DATA1 is used for
-		* the first transaction data packet and DATA0 is used
-		* for the second transaction data packet.  If there are
-		* three transactions per microframe, DATA2 is used for
-		* the first transaction data packet, DATA1 is used for
-		* the second, and DATA0 is used for the third."
-		*
-		* IOW, we should satisfy the following cases:
-		*
-		* 1) length <= maxpacket
-		*	- DATA0
-		*
-		* 2) maxpacket < length <= (2 * maxpacket)
-		*	- DATA1, DATA0
-		*
-		* 3) (2 * maxpacket) < length <= (3 * maxpacket)
-		*	- DATA2, DATA1, DATA0
-		*/
+		 * USB Specification 2.0 Section 5.9.2 states that: "If
+		 * there is only a single transaction in the microframe,
+		 * only a DATA0 data packet PID is used.  If there are
+		 * two transactions per microframe, DATA1 is used for
+		 * the first transaction data packet and DATA0 is used
+		 * for the second transaction data packet.  If there are
+		 * three transactions per microframe, DATA2 is used for
+		 * the first transaction data packet, DATA1 is used for
+		 * the second, and DATA0 is used for the third."
+		 *
+		 * IOW, we should satisfy the following cases:
+		 *
+		 * 1) length <= maxpacket
+		 *	- DATA0
+		 *
+		 * 2) maxpacket < length <= (2 * maxpacket)
+		 *	- DATA1, DATA0
+		 *
+		 * 3) (2 * maxpacket) < length <= (3 * maxpacket)
+		 *	- DATA2, DATA1, DATA0
+		 */
 		mult = DIV_ROUND_UP(*length, max);
 	} else {
 		*length = min(req->req.length - req->req.actual,
-				(unsigned)EP_MAX_LENGTH_TRANSFER);
+				(unsigned int)EP_MAX_LENGTH_TRANSFER);
 	}
 
 	udc = req->ep->udc;
@@ -684,6 +686,7 @@ static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
 
 	dtd->size_ioc_sts = temp;
 
+	/* Ensure that updates to the DTD will occur before priming */
 	mb();
 
 	return dtd;
@@ -692,7 +695,7 @@ static struct mv_dtd *build_dtd(struct mv_req *req, unsigned *length,
 /* generate dTD linked list for a request */
 static int req_to_dtd(struct mv_req *req)
 {
-	unsigned count;
+	unsigned int count;
 	int is_last, is_first = 1;
 	struct mv_dtd *dtd, *last_dtd = NULL;
 	dma_addr_t dma;
@@ -745,7 +748,7 @@ static int mv_ep_enable(struct usb_ep *_ep,
 
 	direction = ep_dir(ep);
 	max = usb_endpoint_maxp(desc);
-	pr_debug("mv_ep_enable: %d MPS= 0x%x \n", ep->ep_num, max);
+	dev_dbg(&udc->dev->dev, "%s: %d MPS= 0x%x\n", __func__, ep->ep_num, max);
 
 	/*
 	 * disable HW zero length termination select
@@ -766,10 +769,10 @@ static int mv_ep_enable(struct usb_ep *_ep,
 		dev_info(&udc->dev->dev,
 			"ep=%d %s: Init ERROR: ENDPTPRIME=0x%x,"
 			" ENDPTSTATUS=0x%x, bit_pos=0x%x\n",
-			(unsigned)ep->ep_num, direction ? "SEND" : "RECV",
-			(unsigned)readl(&udc->op_regs->epprime),
-			(unsigned)readl(&udc->op_regs->epstatus),
-			(unsigned)bit_pos);
+			(unsigned int)ep->ep_num, direction ? "SEND" : "RECV",
+			(unsigned int)readl(&udc->op_regs->epprime),
+			(unsigned int)readl(&udc->op_regs->epstatus),
+			(unsigned int)bit_pos);
 		goto en_done;
 	}
 	/* Set the max packet length, interrupt on Setup and Mult fields */
@@ -891,7 +894,7 @@ static int  mv_ep_disable(struct usb_ep *_ep)
 			: (EPCTRL_RX_ENABLE | EPCTRL_RX_TYPE));
 	writel(epctrlx, &udc->op_regs->epctrlx[ep->ep_num]);
 
-	pr_debug("mv_ep_disable: %d \n", ep->ep_num);
+	dev_dbg(&udc->dev->dev, "%s: ep_num: ep_num: %d\n", __func__, ep->ep_num);
 
 	/* nuke all pending requests (does flush) */
 	nuke(ep, -ESHUTDOWN);
@@ -917,7 +920,7 @@ mv_alloc_request(struct usb_ep *_ep, gfp_t gfp_flags)
 {
 	struct mv_req *req = NULL;
 
-	req = kzalloc(sizeof *req, gfp_flags);
+	req = kzalloc(sizeof(*req), gfp_flags);
 	if (!req)
 		return NULL;
 
@@ -971,8 +974,8 @@ static void mv_ep_fifo_flush(struct usb_ep *_ep)
 		if (loops == 0) {
 			dev_err(&udc->dev->dev,
 				"TIMEOUT for ENDPTSTATUS=0x%x, bit_pos=0x%x\n",
-				(unsigned)readl(&udc->op_regs->epstatus),
-				(unsigned)bit_pos);
+				readl(&udc->op_regs->epstatus),
+				bit_pos);
 			return;
 		}
 		/* Write 1 to the Flush register */
@@ -987,10 +990,9 @@ static void mv_ep_fifo_flush(struct usb_ep *_ep)
 			 */
 			if (inter_loops == 0) {
 				dev_err(&udc->dev->dev,
-					"TIMEOUT for ENDPTFLUSH=0x%x,"
-					"bit_pos=0x%x\n",
-					(unsigned)readl(&udc->op_regs->epflush),
-					(unsigned)bit_pos);
+					"TIMEOUT for ENDPTFLUSH=0x%x, bit_pos=0x%x\n",
+					readl(&udc->op_regs->epflush),
+					bit_pos);
 				return;
 			}
 			inter_loops--;
@@ -1308,7 +1310,7 @@ static void udc_stop(struct mv_udc *udc)
 {
 	u32 tmp;
 
-	pr_debug("udc_stop ...\n");
+	dev_dbg(&udc->dev->dev, "%s ...\n", __func__);
 	/* Disable interrupts */
 	tmp = readl(&udc->op_regs->usbintr);
 	tmp &= ~(USBINTR_INT_EN | USBINTR_ERR_INT_EN |
@@ -1328,7 +1330,7 @@ static void udc_start(struct mv_udc *udc)
 {
 	u32 usbintr;
 
-	pr_debug("udc_start ...\n");
+	dev_dbg(&udc->dev->dev, "%s ...\n", __func__);
 	usbintr = USBINTR_INT_EN | USBINTR_ERR_INT_EN | USBINTR_SYS_ERR
 		| USBINTR_PORT_CHANGE_DETECT_EN
 		| USBINTR_RESET_EN | USBINTR_DEVICE_SUSPEND;
@@ -1347,7 +1349,7 @@ static int udc_reset(struct mv_udc *udc)
 	unsigned int loops;
 	u32 tmp;
 
-	pr_debug("udc_reset ...\n");
+	dev_dbg(&udc->dev->dev, "%s ...\n", __func__);
 
 	/* Stop the controller */
 	tmp = readl(&udc->op_regs->usbcmd);
@@ -1388,7 +1390,7 @@ static int mv_udc_enable_internal(struct mv_udc *udc)
 {
 	int retval;
 
-	pr_debug("mv_udc_enable_internal: udc->active= %d \n", udc->active);
+	dev_dbg(&udc->dev->dev, "%s: udc->active= %d\n", __func__, udc->active);
 	if (udc->active)
 		return 0;
 
@@ -1426,7 +1428,7 @@ static int mv_udc_enable(struct mv_udc *udc)
 
 static void mv_udc_disable_internal(struct mv_udc *udc)
 {
-	pr_debug("mv_udc_disable_internal... \n");
+	dev_dbg(&udc->dev->dev, "%s...\n", __func__);
 	if (udc->active) {
 		dev_dbg(&udc->dev->dev, "disable udc\n");
 		usb_phy_shutdown(udc->phy);
@@ -1484,12 +1486,11 @@ static int mv_udc_vbus_session(struct usb_gadget *gadget, int is_active)
 	int retval = 0;
 
 	udc = container_of(gadget, struct mv_udc, gadget);
-
 	spin_lock_irqsave(&udc->lock, flags);
 
 	udc->vbus_active = (is_active != 0);
 
-	dev_info(&udc->dev->dev, "%s: softconnect %d, vbus_active %d\n",
+	dev_dbg(&udc->dev->dev, "%s: softconnect %d, vbus_active %d\n",
 		__func__, udc->softconnect, udc->vbus_active);
 
 	if (udc->driver && udc->softconnect && udc->vbus_active) {
@@ -1516,7 +1517,7 @@ out:
 }
 
 /* constrain controller's VBUS power usage */
-static int mv_udc_vbus_draw(struct usb_gadget *gadget, unsigned mA)
+static int mv_udc_vbus_draw(struct usb_gadget *gadget, unsigned int mA)
 {
 	struct mv_udc *udc;
 
@@ -1701,8 +1702,8 @@ static int mv_udc_start(struct usb_gadget *gadget,
 	int retval = 0;
 	unsigned long flags;
 
-	pr_debug("mv_udc_start ... \n");
 	udc = container_of(gadget, struct mv_udc, gadget);
+	dev_dbg(&udc->dev->dev, "%s\n", __func__);
 
 	if (udc->driver)
 		return -EBUSY;
@@ -1742,8 +1743,8 @@ static int mv_udc_stop(struct usb_gadget *gadget)
 	struct mv_udc *udc;
 	unsigned long flags;
 
-	pr_debug("mv_udc_stop ... \n");
 	udc = container_of(gadget, struct mv_udc, gadget);
+	dev_dbg(&udc->dev->dev, "%s ...\n", __func__);
 
 	spin_lock_irqsave(&udc->lock, flags);
 
@@ -1957,7 +1958,7 @@ out:
 	return;
 }
 
-static const char *reqname(unsigned bRequest)
+static const char *reqname(unsigned int bRequest)
 {
 	switch (bRequest) {
 	case USB_REQ_GET_STATUS: return "GET_STATUS";
@@ -1974,7 +1975,7 @@ static const char *reqname(unsigned bRequest)
 	}
 }
 
-static const char *desc_type(unsigned type)
+static const char *desc_type(unsigned int type)
 {
 	switch (type) {
 	case USB_DT_DEVICE: return "USB_DT_DEVICE";
@@ -2279,12 +2280,12 @@ static void irq_process_reset(struct mv_udc *udc)
 	writel((u32)~0, &udc->op_regs->epflush);
 
 	if (readl(&udc->op_regs->portsc[0]) & PORTSCX_PORT_RESET) {
-		dev_info(&udc->dev->dev, "usb bus reset\n");
+		dev_dbg(&udc->dev->dev, "usb bus reset\n");
 		udc->usb_state = USB_STATE_DEFAULT;
 		/* reset all the queues, stop all USB activities */
 		stop_activity(udc, udc->driver);
 	} else {
-		dev_info(&udc->dev->dev, "USB reset portsc 0x%x\n",
+		dev_dbg(&udc->dev->dev, "USB reset portsc 0x%x\n",
 			readl(&udc->op_regs->portsc));
 
 		/*
@@ -2341,6 +2342,7 @@ static void irq_process_port_change(struct mv_udc *udc)
 	if (!(portsc & PORTSCX_PORT_RESET)) {
 		/* Get the speed */
 		u32 speed = portsc & PORTSCX_PORT_SPEED_MASK;
+
 		switch (speed) {
 		case PORTSCX_PORT_SPEED_HIGH:
 			udc->gadget.speed = USB_SPEED_HIGH;
@@ -2407,32 +2409,31 @@ static irqreturn_t mv_udc_irq(int irq, void *dev)
 	/* Clear all the interrupts occurred */
 	writel(status, &udc->op_regs->usbsts);
 
-	if (status & USBSTS_INT) {
+	if (status & USBSTS_INT)
 		irq_process_tr_complete(udc);
-	}
 
 	if (status & USBSTS_ERR) {
-		pr_err("usb ctrl error ... \n");
+		dev_err(&udc->dev->dev, "usb ctrl error ...\n");
 		irq_process_error(udc);
 	}
 
 	if (status & USBSTS_RESET) {
-		pr_debug("usb reset ... \n");
+		dev_info(&udc->dev->dev, "usb reset ...\n");
 		irq_process_reset(udc);
 	}
 
 	if (status & USBSTS_PORT_CHANGE) {
-		pr_debug("usb port change ... \n");
+		dev_dbg(&udc->dev->dev, "usb port change ...\n");
 		irq_process_port_change(udc);
 	}
 
 	if (status & USBSTS_SUSPEND) {
-		pr_debug("usb suspend ... \n");
+		dev_dbg(&udc->dev->dev, "usb suspend ...\n");
 		irq_process_suspend(udc);
 	}
 
 	if (status & USBSTS_SYS_ERR)
-		pr_err("system error ... \n");
+		dev_err(&udc->dev->dev, "system error ...\n");
 
 	spin_unlock(&udc->lock);
 
@@ -2444,7 +2445,7 @@ static int mv_udc_vbus_notifier_call(struct notifier_block *nb,
 {
 	struct mv_udc *udc = container_of(nb, struct mv_udc, notifier);
 
-	pr_debug("mv_udc_vbus_notifier_call : udc->vbus_work\n");
+	dev_dbg(&udc->dev->dev, "%s : udc->vbus_work\n", __func__);
 	/* polling VBUS and init phy may cause too much time*/
 	if (udc->qwork)
 		queue_work(udc->qwork, &udc->vbus_work);
@@ -2461,7 +2462,7 @@ static void mv_udc_vbus_work(struct work_struct *work)
 	udc = container_of(work, struct mv_udc, vbus_work);
 
 	vbus = extcon_get_state(udc->extcon, EXTCON_USB);
-	dev_info(&udc->dev->dev, "vbus is %d\n", vbus);
+	dev_dbg(&udc->dev->dev, "vbus is %d\n", vbus);
 
 	mv_udc_vbus_session(&udc->gadget, vbus);
 }
@@ -2473,10 +2474,9 @@ static int mv_udc_vbus_psy_notifier_call(struct notifier_block *nb,
 
 	struct power_supply *psy = v;
 
-	pr_debug("mv_udc_vbus_psy_notifier_call : udc->vbus_work\n");
-	if (val == PSY_EVENT_PROP_CHANGED && psy == udc->vbus_psy && udc->qwork) {
+	dev_dbg(&udc->dev->dev, "%s : udc->vbus_work\n", __func__);
+	if (val == PSY_EVENT_PROP_CHANGED && psy == udc->vbus_psy && udc->qwork)
 		queue_work(udc->qwork, &udc->vbus_work);
-	}
 
 	return NOTIFY_OK;
 }
@@ -2500,7 +2500,7 @@ static void mv_udc_vbus_psy_work(struct work_struct *work)
 
 	udc = container_of(work, struct mv_udc, vbus_work);
 	vbus = mv_udc_query_vbus_psy(udc);
-	pr_debug("mv_udc_vbus_psy_work : udc->vbus_psy return: %d\n", vbus);
+	dev_dbg(&udc->dev->dev, "%s : udc->vbus_psy return: %d\n", __func__, vbus);
 
 	mv_udc_vbus_session(&udc->gadget, vbus);
 }
@@ -2532,8 +2532,7 @@ static int mv_udc_remove(struct platform_device *pdev)
 	}
 
 	/* free memory allocated in probe */
-	if (udc->dtd_pool)
-		dma_pool_destroy(udc->dtd_pool);
+	dma_pool_destroy(udc->dtd_pool);
 
 	if (udc->ep_dqh)
 		dma_free_coherent(&pdev->dev, udc->ep_dqh_size,
@@ -2584,7 +2583,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 	void __iomem *ciu_addr;
 	u32 value;
 
-	pr_info("K1X_UDC: mv_udc_probe enter ...\n");
+	dev_info(&pdev->dev, "%s enter ...Driver: v2\n", __func__);
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
 	if (pdata == NULL) {
 		dev_err(&pdev->dev, "failed to allocate memory for platform_data\n");
@@ -2619,7 +2618,7 @@ static int mv_udc_probe(struct platform_device *pdev)
 				dev_err(&pdev->dev, "couldn't get extcon device\n");
 				return -EPROBE_DEFER;
 			}
-			dev_info(&pdev->dev, "extcon_dev name: %s \n", extcon_get_edev_name(udc->extcon));
+			dev_info(&pdev->dev, "extcon_dev name: %s\n", extcon_get_edev_name(udc->extcon));
 		} else {
 			dev_err(&pdev->dev, "usb extcon cable is not exist\n");
 			return -EINVAL;
@@ -2662,15 +2661,14 @@ static int mv_udc_probe(struct platform_device *pdev)
 
 	udc->phy = devm_usb_get_phy_by_phandle(&pdev->dev, "usb-phy", 0);
 	if (IS_ERR_OR_NULL(udc->phy)) {
-		pr_info("K1X_UDC: mv_udc_probe exit: no usb-phy found ...\n");
+		dev_err(&udc->dev->dev, "%s defered: no usb-phy found ...\n", __func__);
 		return -EPROBE_DEFER;
 	}
 
 	/* we will acces controller register, so enable the clk */
 	retval = mv_udc_enable_internal(udc);
-	if (retval) {
+	if (retval)
 		return retval;
-	}
 
 	udc->op_regs =
 		(struct mv_op_regs __iomem *)((unsigned long)udc->cap_regs
@@ -2708,7 +2706,8 @@ static int mv_udc_probe(struct platform_device *pdev)
 	memset(udc->ep_dqh, 0, size);
 
 	udc->ep_dqh_size = size;
-	pr_info("mv_udc: dqh size = 0x%zx  udc->ep_dqh_dma = 0x%llx\n", size, udc->ep_dqh_dma);
+	dev_info(&udc->dev->dev, "dqh size = 0x%zx  udc->ep_dqh_dma = 0x%llx\n",
+		size, udc->ep_dqh_dma);
 
 	/* create dTD dma_pool resource */
 	udc->dtd_pool = dma_pool_create("mv_dtd",
