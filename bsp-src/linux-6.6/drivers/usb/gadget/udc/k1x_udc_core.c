@@ -39,6 +39,7 @@
 #include <linux/extcon.h>
 #include <linux/extcon-provider.h>
 #include <linux/debugfs.h>
+#include <linux/of_reserved_mem.h>
 
 #include "k1x_ci_udc.h"
 
@@ -2580,6 +2581,8 @@ static int mv_udc_probe(struct platform_device *pdev)
 	struct resource *r;
 	size_t size;
 	struct device_node *np = pdev->dev.of_node;
+	void __iomem *ciu_addr;
+	u32 value;
 
 	pr_info("K1X_UDC: mv_udc_probe enter ...\n");
 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
@@ -2621,6 +2624,14 @@ static int mv_udc_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "usb extcon cable is not exist\n");
 			return -EINVAL;
 		}
+	}
+
+	if (of_property_read_bool(np, "spacemit,ciu-qos-max")) {
+		ciu_addr = (void __iomem *)ioremap(0xD4282C00, 0x200);
+		// modified usbotg ciu qos
+		value = readl_relaxed(ciu_addr + 0x011c);
+		writel(value | (0xff << 8), ciu_addr + 0x011c);
+		dev_info(&pdev->dev, "ciu qos set to x%x\n", readl(ciu_addr + 0x011c));
 	}
 
 	/* udc only have one sysclk. */
@@ -2679,6 +2690,14 @@ static int mv_udc_probe(struct platform_device *pdev)
 
 	size = udc->max_eps * sizeof(struct mv_dqh) * 2;
 	size = (size + DQH_ALIGNMENT - 1) & ~(DQH_ALIGNMENT - 1);
+
+	if (of_property_read_bool(np, "spacemit,use-reserved-dma")) {
+		dev_info(&pdev->dev, "use reserved memory region for dma\n");
+		retval = of_reserved_mem_device_init(&pdev->dev);
+		if (retval)
+			dev_err(&pdev->dev, "Failed to reserve dma memory!\n");
+	}
+
 	udc->ep_dqh = dma_alloc_coherent(&pdev->dev, size,
 					&udc->ep_dqh_dma, GFP_KERNEL);
 	if (udc->ep_dqh == NULL) {
@@ -2686,6 +2705,8 @@ static int mv_udc_probe(struct platform_device *pdev)
 		retval = -ENOMEM;
 		goto err_disable_internal;
 	}
+	memset(udc->ep_dqh, 0, size);
+
 	udc->ep_dqh_size = size;
 	pr_info("mv_udc: dqh size = 0x%zx  udc->ep_dqh_dma = 0x%llx\n", size, udc->ep_dqh_dma);
 
