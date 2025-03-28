@@ -15,7 +15,6 @@
 
 / {
 	model = "spacemit k1-x LX-V10 board";
-	modules_usrload = "8852bs";
 
 	cpus: cpus {
 		#address-cells = <1>;
@@ -139,30 +138,6 @@
 		vin-supply = <&dc_12v>;
 	};
 
-	rf_pwrseq: rf-pwrseq {
-		compatible = "spacemit,rf-pwrseq";
-		//vdd-supply = <&ldo_7>;
-		//vdd_voltage = <3300000>;
-		io-supply = <&dcdc_3>;
-		io_voltage = <1800000>;
-		pwr-gpios  = <&gpio 67 0>;
-		status = "okay";
-
-		wlan_pwrseq: wlan-pwrseq {
-			compatible = "spacemit,wlan-pwrseq";
-			regon-gpios = <&gpio 116 0>;
-			interrupt-parent = <&pinctrl>;
-			interrupts = <268>;
-			pinctrl-names = "default";
-			pinctrl-0 = <&pinctrl_wlan_wakeup>;
-		};
-
-		bt_pwrseq: bt-pwrseq {
-			compatible = "spacemit,bt-pwrseq";
-			reset-gpios     = <&gpio 63 0>;
-		};
-	};
-
 	leds {
 		compatible = "gpio-leds";
 
@@ -202,6 +177,17 @@
 	status = "disabled";
 };
 
+&uart5 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart5_4>;
+	status = "okay";
+};
+
+&uart9 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart9_2>;
+	status = "okay";
+};
 
 &dpu_online2_hdmi {
 	memory-region = <&dpu_resv>;
@@ -234,7 +220,7 @@
 		#size-cells = <1>;
 
 		power-domains = <&power K1X_PMU_DUMMY_PWR_DOMAIN>;
-		status = "disabled";
+		status = "okay";
 
 		mac_address0: mac_address0@0 {
 			reg = <0x0 6>;
@@ -524,6 +510,13 @@
 		pinctrl-single,pins = <
 			K1X_PADCONF(GPIO_47, MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_tx */
 			K1X_PADCONF(GPIO_48, MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_rx */
+		>;
+	};
+
+	pinctrl_uart5_4: uart5_4_grp {
+		pinctrl-single,pins =<
+			K1X_PADCONF(PRI_TDI, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))	/* uart5_txd */
+			K1X_PADCONF(PRI_TMS, MUX_MODE4, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))	/* uart5_rxd */
 		>;
 	};
 
