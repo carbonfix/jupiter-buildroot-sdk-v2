@@ -675,7 +675,7 @@ static SPACEMIT_CCU_MUX_GATE(pwm19_clk, "pwm19_clk", pwm_parent_names,
 	4, 3, 0x2, 0x2, 0x0,
 	0);
 static const char *ssp_parent_names[] = { "pll1_d384_6p4", "pll1_d192_12p8", "pll1_d96_25p6",
-	"pll1_d48_51p2", "pll1_d768_3p2", "pll1_d1536_1p6", "pll1_d3072_0p8"
+	"pll1_d48_51p2", "pll1_d768_3p2", "pll1_d1536_1p6", "pll1_d3072_0p8", "vctcxo_1"
 };
 static SPACEMIT_CCU_MUX_GATE(ssp3_clk, "ssp3_clk", ssp_parent_names,
 	BASE_TYPE_APBC, APBC_SSP3_CLK_RST,
