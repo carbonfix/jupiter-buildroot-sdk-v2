@@ -48,7 +48,7 @@ static int fts_i2c_read(struct i2c_client *client, char *writebuf,
 		};
 		ret = i2c_transfer(client->adapter, msgs, 2);
 		if (ret < 0)
-			LOG_ERR("i2c read error, %d\n", ret);
+			LOG_INFO("i2c read issue, please check touchscreen connection, %d\n", ret);
 	} else {
 		struct i2c_msg msgs[] = {
 			{
@@ -60,7 +60,7 @@ static int fts_i2c_read(struct i2c_client *client, char *writebuf,
 		};
 		ret = i2c_transfer(client->adapter, msgs, 1);
 		if (ret < 0)
-			LOG_ERR("i2c read error, %d\n", ret);
+			LOG_INFO("i2c read issue, please check touchscreen connection, %d\n", ret);
 	}
 
 	return ret;
