@@ -68,8 +68,9 @@ struct spacemit_k1x_clk {
 };
 
 struct clk_hw_table {
-	char	*name;
-	u32 clk_hw_id;
+	char		*name;
+	u32		clk_hw_id;
+	unsigned long	rate;
 };
 
 extern spinlock_t g_cru_lock;
