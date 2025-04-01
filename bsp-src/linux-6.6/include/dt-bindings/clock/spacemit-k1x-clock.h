@@ -228,5 +228,10 @@
 #define CLK_AUDIO_APB       212
 #define CLK_AUDIO_AXI       213
 
-#define CLK_MAX_NO      214
+#define CLK_PM_MN_SRC       214
+#define CLK_PM_MN           215
+#define CLK_PM_MN2_SRC      216
+#define CLK_PM_MN2          217
+
+#define CLK_MAX_NO          218
 #endif /* _DT_BINDINGS_CLK_SPACEMIT_K1X_H_ */
