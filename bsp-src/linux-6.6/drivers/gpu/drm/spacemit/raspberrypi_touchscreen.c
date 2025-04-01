@@ -398,14 +398,13 @@ static int rpi_touchscreen_probe(struct i2c_client *i2c)
 						GPIOD_IN);
 	if (IS_ERR_OR_NULL(ts->enable_gpio)) {
 		dev_err(dev, "%s() failed get enable gpio\n", __func__);
-		return PTR_ERR(ts->enable_gpio);
 	}else{
 		gpiod_direction_output(ts->enable_gpio, 1);
 		mdelay(200);
 	}
 	ver = rpi_touchscreen_i2c_read(ts, REG_ID);
 	if (ver < 0) {
-		dev_err(dev, "Atmel I2C read failed: %d\n", ver);
+		dev_warn(dev, "Atmel I2C read issue: %d, please check LCD connection\n", ver);
 		return -ENODEV;
 	}
 
