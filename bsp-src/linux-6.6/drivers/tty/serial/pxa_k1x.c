@@ -29,6 +29,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/pm_runtime.h>
 #include <linux/platform_device.h>
 #include <linux/tty.h>
@@ -58,7 +59,7 @@
 
 #define UARTCLK_FPGA		(14750000)
 
-#define NUM_UART_PORTS		(10)
+#define NUM_UART_PORTS		(12)
 #define BT_UART_PORT		(2)
 
 #define UART_FCR_PXA_BUS32	(0x20)	/* 32-Bit Peripheral Bus */
@@ -80,7 +81,7 @@
 #define STARTUP_MSG			"startup"
 #define IRQUP_MSG			"irqon"
 
-static unsigned long long private_data[1];
+static unsigned long long private_data[2];
 
 struct instance_data {
 	struct rpmsg_device *rpdev;
@@ -2089,8 +2090,13 @@ static const struct of_device_id serial_pxa_dt_ids[] = {
 	{}
 };
 
-static const struct of_device_id r_serial_pxa_dt_ids[] = {
-	{ .compatible = "spacemit,rcpu-pxa-uart", },
+static const struct of_device_id r_serial_pxa0_dt_ids[] = {
+	{ .compatible = "spacemit,rcpu-pxa-uart0", .data = &private_data[0] },
+	{}
+};
+
+static const struct of_device_id r_serial_pxa1_dt_ids[] = {
+	{ .compatible = "spacemit,rcpu-pxa-uart1", .data = &private_data[1] },
 	{}
 };
 
@@ -2273,10 +2279,17 @@ static int serial_pxa_probe(struct platform_device *dev)
 		}
 		disable_irq(sport->port.irq);
 	} else {
-		struct instance_data *idata = (struct instance_data*)private_data[0];
+		struct instance_data *idata;
 		struct rpmsg_device *rpdev;
+		const struct of_device_id *of_id;
 		int ret;
+		if ((of_id = of_match_device(r_serial_pxa0_dt_ids, &dev->dev)))
+			idata = (struct instance_data *)(*((unsigned long long *)of_id->data));
+		else if ((of_id = of_match_device(r_serial_pxa1_dt_ids, &dev->dev)))
+			idata = (struct instance_data *)(*((unsigned long long *)of_id->data));
 
+		if(!of_id)
+			return -ENODEV;
 		rpdev = idata->rpdev;
 		idata->dev = sport;
 		ret = rpmsg_send(rpdev->ept, STARTUP_MSG, strlen(STARTUP_MSG));
@@ -2426,20 +2439,35 @@ module_init(serial_pxa_init);
 module_exit(serial_pxa_exit);
 
 #ifdef CONFIG_SOC_SPACEMIT_K1X
-static struct platform_driver r_serial_pxa_driver = {
-	.probe = serial_pxa_probe,
-	.remove = serial_pxa_remove,
-	.driver = {
-		.name = "pxa2xx-ruart",
+static struct platform_driver r_serial_pxa_driver[] = {
+	{
+		.probe = serial_pxa_probe,
+		.remove = serial_pxa_remove,
+		.driver = {
+			.name = "pxa2xx-ruart0",
 #ifdef CONFIG_PM
-		.pm = &serial_pxa_pm_ops,
+			.pm = &serial_pxa_pm_ops,
 #endif
-		.suppress_bind_attrs = true,
-		.of_match_table = r_serial_pxa_dt_ids,
+			.suppress_bind_attrs = true,
+			.of_match_table = r_serial_pxa0_dt_ids,
+		},
+	},
+	{
+		.probe = serial_pxa_probe,
+		.remove = serial_pxa_remove,
+		.driver = {
+			.name = "pxa2xx-ruart1",
+#ifdef CONFIG_PM
+			.pm = &serial_pxa_pm_ops,
+#endif
+			.suppress_bind_attrs = true,
+			.of_match_table = r_serial_pxa1_dt_ids,
+		},
 	},
 };
 
 static struct rpmsg_device_id rpmsg_driver_ruart_id_table[] = {
+	{ .name	= "ruart-service0", .driver_data = 0 },
 	{ .name	= "ruart-service1", .driver_data = 0 },
 	{ },
 };
@@ -2475,9 +2503,13 @@ static int rpmsg_ruart_client_probe(struct rpmsg_device *rpdev)
 	dev_set_drvdata(&rpdev->dev, idata);
 	idata->rpdev = rpdev;
 
-	private_data[0] = (unsigned long long)idata;
-
-	platform_driver_register(&r_serial_pxa_driver);
+	for (int i = 0; i < sizeof(rpmsg_driver_ruart_id_table)/sizeof(struct rpmsg_device_id); i++) {
+		if (!strncmp(rpdev->id.name, rpmsg_driver_ruart_id_table[i].name, sizeof(rpdev->id.name))) {
+			private_data[i] = (unsigned long long)idata;
+			platform_driver_register(&r_serial_pxa_driver[i]);
+			break;
+		}
+	}
 
 	return 0;
 }
@@ -2485,7 +2517,12 @@ static int rpmsg_ruart_client_probe(struct rpmsg_device *rpdev)
 static void rpmsg_ruart_client_remove(struct rpmsg_device *rpdev)
 {
 	dev_info(&rpdev->dev, "rpmsg uart client driver is removed\n");
-	platform_driver_unregister(&r_serial_pxa_driver);
+	for (int i = 0; i < sizeof(rpmsg_driver_ruart_id_table)/sizeof(struct rpmsg_device_id); i++) {
+		if (!strncmp(rpdev->id.name, rpmsg_driver_ruart_id_table[i].name, sizeof(rpdev->id.name))) {
+			platform_driver_unregister(&r_serial_pxa_driver[i]);
+			break;
+		}
+	}
 }
 
 static struct rpmsg_driver rpmsg_ruart_client = {
