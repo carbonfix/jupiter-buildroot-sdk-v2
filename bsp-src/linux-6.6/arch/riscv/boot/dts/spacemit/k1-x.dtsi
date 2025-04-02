@@ -21,15 +21,17 @@
 
 	aliases {
 		serial0 = &uart0;
-		serial1 = &uart2;
-		serial2 = &uart3;
-		serial3 = &uart4;
-		serial4 = &uart5;
-		serial5 = &uart6;
-		serial6 = &uart7;
-		serial7 = &uart8;
-		serial8 = &uart9;
-		serial9 = &r_uart1;
+		serial1 = &uart1;
+		serial2 = &uart2;
+		serial3 = &uart3;
+		serial4 = &uart4;
+		serial5 = &uart5;
+		serial6 = &uart6;
+		serial7 = &uart7;
+		serial8 = &uart8;
+		serial9 = &uart9;
+		serial10 = &r_uart0;
+		serial11 = &r_uart1;
 		mmc0 = &sdhci0;
 		mmc1 = &sdhci1;
 		mmc2 = &sdhci2;
@@ -815,6 +817,22 @@
 			status = "ok";
 		};
 
+		uart1: uart@f0612000 {
+			compatible = "spacemit,pxa-uart";
+			reg = <0x0 0xf0612000 0x0 0x100>;
+			interrupt-parent = <&intc>;
+			interrupts = <43>;
+			clocks = <&ccu CLK_SEC_UART1>, <&ccu CLK_SLOW_UART>;
+			clock-names = "func", "gate";
+			resets = <&reset RESET_SEC_UART1>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
+			interconnects = <&dram_range4>;
+			interconnect-names = "dma-mem";
+			status = "disabled";
+                };
+
 		uart2: uart@d4017100 {
 			compatible = "spacemit,pxa-uart";
 			reg = <0x0 0xd4017100 0x0 0x100>;
@@ -951,8 +969,25 @@
 			status = "disabled";
 		};
 
+		r_uart0: r_uart0@c0881000 {
+			compatible = "spacemit,rcpu-pxa-uart0";
+			reg = <0x0 0xc0881000 0x0 0x100>;
+			clocks = <&ccu CLK_RCPU_UART0>, <&ccu CLK_SLOW_UART>;
+			clock-names = "func", "gate";
+			resets = <&reset RESET_RCPU_UART0>;
+			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
+			clk,pm-runtime,no-sleep;
+			cpuidle,pm-runtime,sleep;
+			rcpu-uart;
+			interconnects = <&dram_range4>;
+			interconnect-names = "dma-mem";
+			reg-shift = <2>;
+			reg-io-width = <4>;
+			status = "disabled";
+		};
+
 		r_uart1: r_uart1@c088d000 {
-			compatible = "spacemit,rcpu-pxa-uart";
+			compatible = "spacemit,rcpu-pxa-uart1";
 			reg = <0x0 0xc088d000 0x0 0x100>;
 			clocks = <&ccu CLK_RCPU_UART1>, <&ccu CLK_SLOW_UART>;
 			clock-names = "func", "gate";
@@ -965,7 +1000,7 @@
 			interconnect-names = "dma-mem";
 			reg-shift = <2>;
 			reg-io-width = <4>;
-			status = "ok";
+			status = "disabled";
 		};
 
 		mailbox: mailbox@d4013400 {
