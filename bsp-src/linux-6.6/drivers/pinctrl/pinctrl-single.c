@@ -33,6 +33,7 @@
 #include <linux/reset.h>
 #include <linux/clk.h>
 #include <linux/syscore_ops.h>
+#include <dt-bindings/pinctrl/k1-x-pinctrl.h>
 #endif
 
 #include "core.h"
@@ -59,6 +60,9 @@ struct pcs_func_vals {
 	void __iomem *reg;
 	unsigned val;
 	unsigned mask;
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+	unsigned is_emmc_pin;
+#endif
 };
 
 /**
@@ -194,6 +198,7 @@ struct pcs_device {
 	struct resource gpio_res;
 	void __iomem *gpio_base;
 	unsigned gpio_size;
+	void __iomem *emmc_pin_ctrl;
 #endif
 	void *saved_vals;
 	unsigned size;
@@ -411,6 +416,18 @@ static int pcs_set_mux(struct pinctrl_dev *pctldev, unsigned fselector,
 		raw_spin_lock_irqsave(&pcs->lock, flags);
 		val = pcs->read(vals->reg);
 
+#ifdef	CONFIG_SOC_SPACEMIT_K1X
+		if (vals->is_emmc_pin) {
+			if (vals->val & MUX_MODE1)
+				val |= BIT(20);
+			else
+				val &= ~(BIT(20));
+			pcs->write(val, vals->reg);
+			raw_spin_unlock_irqrestore(&pcs->lock, flags);
+			continue;
+		}
+#endif
+
 		if (pcs->bits_per_mux)
 			mask = vals->mask;
 		else
@@ -444,6 +461,19 @@ static int pcs_request_gpio(struct pinctrl_dev *pctldev,
 		if (pin >= frange->offset + frange->npins
 			|| pin < frange->offset)
 			continue;
+
+#ifdef	CONFIG_SOC_SPACEMIT_K1X
+		if ((pin >= EMMC_D0) && (pin <= EMMC_CMD)) {
+			u32 val = pcs->read(pcs->emmc_pin_ctrl);
+			if (frange->gpiofunc & MUX_MODE1)
+				val |= BIT(20);
+			else
+				val &= ~(BIT(20));
+
+			pcs->write(val, pcs->emmc_pin_ctrl);
+			continue;
+		}
+#endif
 
 		offset = pcs_pin_reg_offset_get(pcs, pin);
 
@@ -1171,6 +1201,15 @@ static int pcs_parse_one_pinctrl_entry(struct pcs_device *pcs,
 				np, offset);
 			break;
 		}
+
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+		vals[found].is_emmc_pin = 0;
+		if ((pin >= EMMC_D0) && (pin <= EMMC_CMD)) {
+			vals[found].is_emmc_pin = 1;
+			vals[found].reg = pcs->emmc_pin_ctrl;
+		}
+#endif
+
 		pins[found++] = pin;
 	}
 
@@ -2142,6 +2181,17 @@ static int pcs_probe(struct platform_device *pdev)
 	pcs->gpio_base = ioremap(res->start, resource_size(res));
 	if (!pcs->gpio_base) {
 		dev_err(pcs->dev, "could not ioremap\n");
+		return -ENODEV;
+	}
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+	if (!res) {
+		dev_err(pcs->dev, "could not get resource of the emmc pin controller\n");
+		return -ENODEV;
+	}
+	pcs->emmc_pin_ctrl = ioremap(res->start, resource_size(res));
+	if (!pcs->emmc_pin_ctrl) {
+		dev_err(pcs->dev, "could not ioremap the reg of the emmc pin controller.\n");
 		return -ENODEV;
 	}
 #endif

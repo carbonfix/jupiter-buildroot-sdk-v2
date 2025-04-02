@@ -141,6 +141,18 @@
 #define GPIO_126    PINID(145)
 #define GPIO_127    PINID(146)
 
+#define EMMC_D0     PINID(147)
+#define EMMC_D1     PINID(148)
+#define EMMC_D2     PINID(149)
+#define EMMC_D3     PINID(150)
+#define EMMC_D4     PINID(151)
+#define EMMC_D5     PINID(152)
+#define EMMC_D6     PINID(153)
+#define EMMC_D7     PINID(154)
+#define EMMC_DS     PINID(155)
+#define EMMC_CLK    PINID(156)
+#define EMMC_CMD    PINID(157)
+
 /* pin mux */
 #define MUX_MODE0       0
 #define MUX_MODE1       1
