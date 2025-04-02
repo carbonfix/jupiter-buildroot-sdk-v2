@@ -1320,11 +1320,15 @@ static int spm_vdev_vidioc_dqbuf(struct file *file, void *fh, struct v4l2_buffer
 {
 	struct video_device *vnode = video_devdata(file);
 	struct spm_camera_vnode *sc_vnode = container_of(vnode, struct spm_camera_vnode, vnode);
-	int ret = 0;
+	int ret = 0, i = 0;
 
 	mutex_lock(&sc_vnode->mlock);
 	ret = vb2_dqbuf(&sc_vnode->buf_queue, b, file->f_flags & O_NONBLOCK);
 	mutex_unlock(&sc_vnode->mlock);
+
+	for (i = 0; i < 11; i++) {
+		b->m.planes[0].reserved[i] = sc_vnode->v4l2_plane0_reserved[b->index][i];
+	}
 	return ret;
 }
 

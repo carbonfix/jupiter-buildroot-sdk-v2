@@ -44,6 +44,7 @@ struct spm_camera_vnode {
 	unsigned int ok_frm;
 	unsigned int planes_offset[VB2_MAX_FRAME][VB2_MAX_PLANES];
 	unsigned int v4l2_buf_flags[VB2_MAX_FRAME];
+	unsigned int v4l2_plane0_reserved[VB2_MAX_FRAME][11];
 	struct spm_camera_vbuffer *sc_vb;
 	void *usr_data;
 };

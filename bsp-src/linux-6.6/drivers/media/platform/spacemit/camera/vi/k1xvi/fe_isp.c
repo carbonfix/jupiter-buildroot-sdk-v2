@@ -4249,6 +4249,7 @@ static irqreturn_t fe_isp_dma_irq_handler(int irq, void *dev_id)
 	unsigned long tasklet_state[ISP_DMA_WORK_MAX_CNT];
 	int ret = 0;
 	static unsigned long print_jiffies = 0;
+	uint64_t timestamp = 0;
 
 	if (!isp_ctx->dma_block)
 		return IRQ_HANDLED;
@@ -4459,6 +4460,9 @@ static irqreturn_t fe_isp_dma_irq_handler(int irq, void *dev_id)
 								if (sc_pipeline && sc_pipeline->is_online_mode) {
 									pos->vb2_v4l2_buf.sequence = frame_idx;
 									pos->vb2_v4l2_buf.vb2_buf.timestamp = ktime_get_boottime_ns();
+									timestamp = ktime_get_real_ns();
+									dma_ctx->vnode->v4l2_plane0_reserved[pos->vb2_v4l2_buf.vb2_buf.index][0] = (uint32_t)(timestamp >> 32);
+									dma_ctx->vnode->v4l2_plane0_reserved[pos->vb2_v4l2_buf.vb2_buf.index][1] = (uint32_t)(timestamp & 0xFFFFFFFF);
 								}
 								atomic_inc(&dma_ctx->busy_cnt);
 							}
