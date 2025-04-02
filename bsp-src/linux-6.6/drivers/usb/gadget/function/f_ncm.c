@@ -71,6 +71,7 @@ struct f_ncm {
 	/* For multi-frame NDP TX */
 	struct sk_buff			*skb_tx_data;
 	struct sk_buff			*skb_tx_ndp;
+	struct sk_buff			*skb_nzlp_remain;
 	u16				ndp_dgram_count;
 	struct hrtimer			task_timer;
 };
@@ -1172,8 +1173,43 @@ static int ncm_unwrap_ntb(struct gether *port,
 	int		dgram_counter;
 	int		to_process = skb->len;
 
+	if (unlikely(ncm->skb_nzlp_remain)) {
+		/*
+		 * last request have remaining bytes starting with NTH header,
+		 * the skb must larger than two request max size.
+		 */
+		DBG(port->func.config->cdev,
+		    "no-ZLP transfer piece exist, restore it (%d)\n", skb->len);
+		skb_put_data(ncm->skb_nzlp_remain, skb->data, skb->len);
+		swap(ncm->skb_nzlp_remain, skb);
+
+		/* now the full NTB is merged, treat it as nothing ever happend... */
+		dev_consume_skb_any(ncm->skb_nzlp_remain);
+		ncm->skb_nzlp_remain = NULL;
+		ntb_ptr = skb->data;
+		to_process = skb->len;
+	}
+
 parse_ntb:
 	tmp = (__le16 *)ntb_ptr;
+
+	/* Avoid out-of-bound access to garbage data */
+	if (unlikely(to_process < opts->nth_size)) {
+		DBG(port->func.config->cdev,
+		    "Found short no-ZLP transfer, store the piece (%d)\n",
+		    to_process);
+		BUG_ON(ncm->skb_nzlp_remain);
+		ncm->skb_nzlp_remain =
+			alloc_skb(to_process + ntb_max, GFP_ATOMIC);
+		skb_put_data(ncm->skb_nzlp_remain, ntb_ptr, to_process);
+		if (ncm->skb_nzlp_remain != NULL)
+			goto free_skb;
+		/*
+		    * Not being strict here, if this 32KB page allocation fails,
+		    * just simply fallback to the original "Wrong NDP SIGN..." process.
+		    * It won't be worse anyway.
+		    */
+	}
 
 	/* dwSignature */
 	if (get_unaligned_le32(tmp) != opts->nth_sign) {
@@ -1197,6 +1233,33 @@ parse_ntb:
 	if (block_len > ntb_max) {
 		INFO(port->func.config->cdev, "OUT size exceeded\n");
 		goto err;
+	}
+
+	/*
+	 * Microsoft declared that the NCM driver isn't officially supported
+	 * on Windows 10. But Windows 10 still ships with an older NCM driver
+	 * that fails to send ZLP. It's altered to send ZLP when transfer
+	 * length is less than dwNtbOutMaxSize on Windows 11.
+	 *
+	 * To address this for Windows 10 users, we kindly implement a workaround
+	 * by merging two requests. The 'unlikely' keyword is used to mitigate
+	 * performance degradation.
+	 */
+	if (unlikely(to_process < block_len)) {
+		DBG(port->func.config->cdev,
+		    "Found no-ZLP transfer, store the piece (%d)\n",
+		    to_process);
+		BUG_ON(ncm->skb_nzlp_remain);
+		ncm->skb_nzlp_remain =
+			alloc_skb(to_process + ntb_max, GFP_ATOMIC);
+		skb_put_data(ncm->skb_nzlp_remain, ntb_ptr, to_process);
+		if (ncm->skb_nzlp_remain != NULL)
+			goto free_skb;
+		/*
+		 * Not being strict here, if this 32KB page allocation fails,
+		 * just simply fallback to the original "Wrong NDP SIGN..." process.
+		 * It won't be worse anyway.
+		 */
 	}
 
 	ndp_index = get_ncm(&tmp, opts->ndp_index);
@@ -1338,6 +1401,7 @@ parse_ntb:
 		goto parse_ntb;
 	}
 
+free_skb:
 	dev_consume_skb_any(skb);
 
 	return 0;
@@ -1729,6 +1793,7 @@ static struct usb_function *ncm_alloc(struct usb_function_instance *fi)
 
 	ncm->port.wrap = ncm_wrap_ntb;
 	ncm->port.unwrap = ncm_unwrap_ntb;
+	pr_info("f_ncm: workaround for No-ZLP Host installed.\n");
 
 	return &ncm->port.func;
 }
