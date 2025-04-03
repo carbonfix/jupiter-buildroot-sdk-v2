@@ -1,0 +1,28 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: k1x-vpu-firmware
+Source: <url://example.com>
+#
+# Please double check copyright with the licensecheck(1) command.
+
+Files:     lib/firmware/linlon-v52_v76-80-2/avs2dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/avsdec.fwb
+           lib/firmware/linlon-v52_v76-80-2/h264dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/h264enc.fwb
+           lib/firmware/linlon-v52_v76-80-2/hevcdec.fwb
+           lib/firmware/linlon-v52_v76-80-2/hevcenc.fwb
+           lib/firmware/linlon-v52_v76-80-2/jpegdec.fwb
+           lib/firmware/linlon-v52_v76-80-2/jpegenc.fwb
+           lib/firmware/linlon-v52_v76-80-2/mpeg2dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/mpeg4dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/rvdec.fwb
+           lib/firmware/linlon-v52_v76-80-2/vc1dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/vp8dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/vp8enc.fwb
+           lib/firmware/linlon-v52_v76-80-2/vp9dec.fwb
+           lib/firmware/linlon-v52_v76-80-2/vp9enc.fwb
+Copyright: __NO_COPYRIGHT_NOR_LICENSE__
+License:   __NO_COPYRIGHT_NOR_LICENSE__
+
+#----------------------------------------------------------------------------
+# Files marked as NO_LICENSE_TEXT_FOUND may be covered by the following
+# license/copyright files.

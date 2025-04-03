@@ -1,0 +1,10 @@
+Notes regarding bundled libraries
+---------------------------------
+
+src/libmatrix       : private
+
+GLESv2 vs GL:
+-------------
+
+We build both GL and GLESv2 version. The *es2* are ones that
+contains the GLESv2 one.

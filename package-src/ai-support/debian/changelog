@@ -1,0 +1,117 @@
+bianbu-ai-support (1.1.1) stable; urgency=medium
+
+  * Support bianbu-23.10 and bianbu-24.04 with spacemit-ort v1.2.0 
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 11 Jul 2024 12:40:33 +0800
+
+bianbu-ai-support (1.1.0) noble-porting; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-24.04/1.1.0
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Tue, 02 Jul 2024 17:40:40 +0800
+
+bianbu-ai-support (1.0.15) mantic-porting; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.15
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Tue, 13 May 2024 18:33:40 +0800
+
+bianbu-ai-support (1.0.14) mantic-porting; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.14
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 09 May 2024 16:33:40 +0800
+
+bianbu-ai-support (1.0.13) mantic-porting; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.13
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Tue, 23 Apr 2024 19:02:48 +0800
+
+bianbu-ai-support (1.0.12) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.12
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 11 Apr 2024 19:01:48 +0800
+
+bianbu-ai-support (1.0.11) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.11
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Tue, 19 Mar 2024 17:13:48 +0800
+
+bianbu-ai-support (1.0.10) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.10
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Mon, 11 Mar 2024 20:59:48 +0800
+
+bianbu-ai-support (1.0.9) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.9
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Fri, 08 Mar 2024 19:59:48 +0800
+
+bianbu-ai-support (1.0.8) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.8
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 24 Feb 2024 13:16:48 +0800
+
+bianbu-ai-support (1.0.7) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.7
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 01 Feb 2024 18:14:18 +0800
+
+bianbu-ai-support (1.0.6) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.6
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 26 Jan 2024 12:52:18 +0800
+
+bianbu-ai-support (1.0.5) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.5
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 25 Jan 2024 21:19:18 +0800
+
+bianbu-ai-support (1.0.4) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.4
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 19 Jan 2024 17:26:18 +0800
+
+bianbu-ai-support (1.0.3) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.3
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 18 Jan 2024 17:26:18 +0800
+
+bianbu-ai-support (1.0.2) mantic-spacemit; urgency=medium
+
+  [ bianbu-ci ]
+  * Sync change from bianbu-23.10/1.0.2
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Tue, 16 Jan 2024 21:00:18 +0800
+
+bianbu-ai-support (1.0.1) mantic-spacemit; urgency=medium
+
+  * Initial for bianbu-23.10
+
+ -- qinhongjie <hongjie.qin@spacemit.com>  Thu, 04 Jan 2024 20:25:23 +0800
+

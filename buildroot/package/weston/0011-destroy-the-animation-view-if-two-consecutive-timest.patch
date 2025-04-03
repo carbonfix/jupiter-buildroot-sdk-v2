@@ -1,0 +1,40 @@
+From 6fd21430c2f5dd1d1caa988746733ca953f594fc Mon Sep 17 00:00:00 2001
+From: liyeshan <yeshan.li@spacemit.com>
+Date: Tue, 14 Jan 2025 16:05:38 +0800
+Subject: [PATCH] destroy the animation view if two consecutive timestamps are
+ equal
+
+---
+ libweston/animation.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/libweston/animation.c b/libweston/animation.c
+index 7785050..8183461 100644
+--- a/libweston/animation.c
++++ b/libweston/animation.c
+@@ -174,18 +174,21 @@ weston_view_animation_frame(struct weston_animation *base,
+ 			     struct weston_view_animation, animation);
+ 	struct weston_compositor *compositor =
+ 		animation->view->surface->compositor;
++	static int64_t last_time = -1;
+ 
+ 	if (base->frame_counter <= 1)
+ 		animation->spring.timestamp = *time;
+ 
+ 	weston_spring_update(&animation->spring, time);
+ 
+-	if (weston_spring_done(&animation->spring) || ((base->frame_counter > 30) && (timespec_to_msec(&animation->spring.timestamp) == timespec_to_msec(time)))) {
++	if (weston_spring_done(&animation->spring) || (last_time == timespec_to_msec(time))) {
+ 		weston_view_schedule_repaint(animation->view);
+ 		weston_view_animation_destroy(animation);
+ 		return;
+ 	}
+ 
++	last_time = timespec_to_msec(time);
++
+ 	if (animation->frame)
+ 		animation->frame(animation);
+ 
+-- 
+2.34.1
+

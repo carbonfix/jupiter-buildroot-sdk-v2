@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="origin" fetch="git@gitee.com:bianbu-linux" />
+  <default revision="k1-bl-v2.1.y" remote="origin" sync-j="8" />
+  <project path="bsp-src/linux-6.6" name="linux-6.6" />
+  <project path="bsp-src/opensbi" name="opensbi" />
+  <project path="bsp-src/uboot-2022.10" name="uboot-2022.10" />
+  <project path="buildroot" name="buildroot" />
+  <project path="buildroot-ext" name="buildroot-ext" />
+  <project path="package-src/ai-support" name="ai-support" />
+  <project path="package-src/glmark2" name="glmark2" />
+  <project path="package-src/img-gpu-powervr" name="img-gpu-powervr"
+    />
+  <project path="package-src/mesa3d" name="mesa3d" />
+  <project path="package-src/k1x-cam" name="k1x-cam" />
+  <project path="package-src/k1x-jpu" name="k1x-jpu" />
+  <project path="package-src/k1x-vpu-firmware" name="k1x-vpu-firmware"
+    />
+  <project path="package-src/k1x-vpu-test" name="k1x-vpu-test" />
+  <project path="package-src/mpp" name="mpp" />
+  <project path="package-src/drm-test" name="drm-test" />
+  <project path="package-src/v2d-test" name="v2d-test" />
+  <project path="package-src/rtk_hciattach" name="rtk_hciattach" />
+  <project path="package-src/factorytest" name="factorytest" />
+  <project path="package-src/usb-gadget" name="usb-gadget" />
+  <project path="package-src/jetson-utils" name="jetson-utils" />
+  <project path="scripts" name="scripts">
+    <copyfile src="Makefile" dest="Makefile" />
+  </project>
+</manifest>

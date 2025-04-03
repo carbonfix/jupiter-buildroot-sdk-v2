@@ -1,0 +1,56 @@
+From 3f42620b43f5cc1803f47cc2cdd70d59f8ac574f Mon Sep 17 00:00:00 2001
+From: lizhirong <zhirong.li@spacemit.com>
+Date: Tue, 5 Nov 2024 11:48:43 +0800
+Subject: [PATCH] spacemitsrc: adapt gst-api V5.7
+
+---
+ ext/spacemit/spacemitsrc/gstspacemitsrc.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/ext/spacemit/spacemitsrc/gstspacemitsrc.c b/ext/spacemit/spacemitsrc/gstspacemitsrc.c
+index c3f74bb..894a770 100755
+--- a/ext/spacemit/spacemitsrc/gstspacemitsrc.c
++++ b/ext/spacemit/spacemitsrc/gstspacemitsrc.c
+@@ -506,7 +506,7 @@ video_frame_release (void *data)
+       GST_DEBUG_OBJECT (frame->src, "video_frame dur is: %" GST_TIME_FORMAT, GST_TIME_ARGS (GST_CLOCK_DIFF (frame->use_dur, gst_clock_get_time (clock))), ", fd: %d", outputBuf->m.fd);
+       gst_object_unref (clock);
+ 
+-      gst_release_cpp_buffer(outputBuf, frame->index);
++      gst_release_cam_buffer(outputBuf, frame->index);
+     }
+     //List_Push out buffer to list
+     // List_Push(cpp_out_list[0], (void*)outputBuf);
+@@ -528,7 +528,7 @@ video_frame_create (GstSpacemitSrc * src, IMAGE_BUFFER_S* buffer)
+   return frame;
+ }
+ 
+-static int gst_get_cpp_buf_callback(IMAGE_BUFFER_S* cpp_out_buffer, gint index)
++static int gst_get_cam_buf_callback(IMAGE_BUFFER_S* cpp_out_buffer, gint index)
+ {
+   VideoFrame * frame = (VideoFrame *) g_hash_table_lookup (frame_hash, cpp_out_buffer);
+   if (!frame) {
+@@ -547,7 +547,7 @@ static int gst_get_cpp_buf_callback(IMAGE_BUFFER_S* cpp_out_buffer, gint index)
+   return 0;
+ }
+ 
+-static int gst_cpp_buf_prepare_callback(void *gst_buf_prepare_data, IMAGE_BUFFER_S* buffer)
++static int gst_cam_buf_prepare_callback(void *gst_buf_prepare_data, IMAGE_BUFFER_S* buffer)
+ {
+   GstSpacemitSrc * src  = (GstSpacemitSrc *) gst_buf_prepare_data;
+ 
+@@ -571,9 +571,9 @@ gst_spacemitsrc_setup_stream (GstSpacemitSrc * src)
+   struct tuning_objs_config tuning_cfg = {0};
+ 
+   GST_DEBUG_OBJECT (src, "start setup stream camera, json:%s", src->filename);
+-  src->para.gst_get_cpp_buffer = gst_get_cpp_buf_callback;
+-  src->para.gst_cpp_buf_prepare = gst_cpp_buf_prepare_callback;
+-  src->para.gst_cpp_buf_prepare_data = src;
++  src->para.gst_get_cam_buffer = gst_get_cam_buf_callback;
++  src->para.gst_cam_buf_prepare = gst_cam_buf_prepare_callback;
++  src->para.gst_cam_buf_prepare_data = src;
+   src->para.jsonfile = src->filename;
+ 
+   ret = gst_setup_camera_start (&src->para);
+-- 
+2.34.1
+

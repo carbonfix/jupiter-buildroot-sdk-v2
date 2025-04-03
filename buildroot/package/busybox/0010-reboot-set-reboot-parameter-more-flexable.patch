@@ -1,0 +1,29 @@
+From ce340b29a6865e4849ff972c6556a7c0de813b69 Mon Sep 17 00:00:00 2001
+From: zhouxl <zhouxl@spacemit.com>
+Date: Sat, 14 Sep 2024 14:31:09 +0800
+Subject: [PATCH] reboot: set reboot parameter more flexable
+
+current only support "reboot" and "reboot bootloader", if we want to add
+a new reboot parameter, we need to modify code in busybox; remove the para
+compare, we can add more reboot parameter without code modification in
+busybox.
+---
+ init/halt.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/init/halt.c b/init/halt.c
+index 9118e7a..2902b40 100644
+--- a/init/halt.c
++++ b/init/halt.c
+@@ -202,7 +202,7 @@ int halt_main(int argc , char **argv)
+ 	for (which = 0; "hpr"[which] != applet_name[0]; which++)
+ 		continue;
+ 
+-	if((argc == 1) ||(argc != 1 && !strcmp(argv[1],"bootloader"))) {
++	if (argc >= 1) {
+ 		char buf[100];
+ 		int pid, ret;
+ 
+-- 
+2.34.1
+

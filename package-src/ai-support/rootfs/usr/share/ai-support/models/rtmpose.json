@@ -1,0 +1,7 @@
+{
+    "name": "Rtmpose",
+    "instance_name": "pose-estimation-inference",
+    "model_path": "/usr/share/ai-support/models/rtmpose-t.q.onnx",
+    "intra_threads_num": 2,
+    "graph_optimization_level": ""
+}

@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+#set -x
+
+function prerm_init() {
+  export APP_NAME=bianbu-ai-support
+  export APP_DATA=/usr/share/applications
+}
+
+function prerm_remove() {
+  :
+}
+
+function prerm_upgrade() {
+  :
+}
+
+function prerm_main() {
+  if [ $# -eq 0 ]; then
+    return;
+  fi
+
+  prerm_init
+  case $1 in
+    remove )            shift; prerm_remove $@;;
+    upgrade )           shift; prerm_upgrade $@;;
+    failed-upgrade )    ;;
+  esac
+}
+
+args="$@"
+prerm_main $@

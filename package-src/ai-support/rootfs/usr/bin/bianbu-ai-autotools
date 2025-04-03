@@ -1,0 +1,93 @@
+#!/bin/bash
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Copyright (c) 2023, spacemit.com, Inc. All Rights Reserved
+#
+# =============================================================
+#
+# Author: hongjie.qin@spacemit.com
+# Brief:  Bianbu AI Auto Toolkit.
+#
+
+set -e
+#set -x
+entry_point=bianbu-ai-support # $(basename ${BASH_SOURCE[0]})
+app_data_dir=/usr/share/applications
+
+cmd=$1
+shift
+
+#xdg-user-dirs-update
+CONFIG_HOME=${XDG_CONFIG_HOME:-~/.config}
+test -f ${CONFIG_HOME}/user-dirs.dirs && . ${CONFIG_HOME}/user-dirs.dirs
+
+function auto_config_desktop() {
+  # desktop dir not exist or missing shortcut parameter
+  if [ ! -d "${XDG_DESKTOP_DIR}" ] || [ $# -ne 1 ]; then return; fi
+  if [ ! $HOME ]; then return; fi
+
+  local desktop=$1
+  local shortcut=$(basename $desktop)
+  local init_setup=${CONFIG_HOME}/${entry_point}/applications/${shortcut%.desktop}-initial-setup-done
+  local action="create" # "update"
+
+  if [ -f ${init_setup} ] && [ "$(cat ${init_setup} | grep ${XDG_DESKTOP_DIR})" ]; then
+    # i.e. desktop is already configured(initial-setup-done)
+    #return
+    if [ -e ${XDG_DESKTOP_DIR}/${shortcut} ]; then
+      if cmp -s "${XDG_DESKTOP_DIR}/${shortcut}" "${app_data_dir}/${shortcut}"; then
+        # desktop exist and exactly same
+        if [ ! "$(gio info ${XDG_DESKTOP_DIR}/${shortcut} | grep 'metadata::trusted: true')" ]; then
+          gio set ${XDG_DESKTOP_DIR}/${shortcut} metadata::trusted true
+        fi
+        return
+      fi
+      # i.e. desktop exist but need to be updated
+      action="update"
+    else
+      # desktop has been removed
+      return
+    fi
+  fi
+
+  # install icon if not exist or need update
+  if [ ! -f ${XDG_DESKTOP_DIR}/${shortcut} ] || [ "${action}" = "update" ]; then
+    xdg-desktop-icon install --novendor ${desktop}
+    if test $? -eq 0; then
+      chmod +x ${XDG_DESKTOP_DIR}/${shortcut}
+    else
+      action="${action} failed"
+    fi
+  fi
+  if [ -f ${XDG_DESKTOP_DIR}/${shortcut} ]; then
+    if [ ! "$(gio info ${XDG_DESKTOP_DIR}/${shortcut} | grep 'metadata::trusted: true')" ]; then
+      gio set ${XDG_DESKTOP_DIR}/${shortcut} metadata::trusted true
+    fi
+  fi
+  # update init setup info
+  mkdir -p ${CONFIG_HOME}/${entry_point}/applications
+  echo ${XDG_DESKTOP_DIR}/${shortcut} "auto" ${action} $(date) >> ${init_setup}
+}
+
+if [[ $cmd == "desktop" ]]; then
+  auto_config_desktop $@
+else
+  echo "[ERROR] Unknown command: ${cmd}"
+  exit 1
+fi
