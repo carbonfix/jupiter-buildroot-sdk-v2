@@ -210,11 +210,11 @@
 	spacemit-dpu-escclk = <76800000>;
 	dsi_1v2-supply = <&ldo_5>;
 	vin-supply-names = "dsi_1v2";
-	status = "okay";
+	status = "disabled";
 };
 
 &dsi2 {
-	status = "okay";
+	status = "disabled";
 
 	panel2: panel2@0 {
 		status = "ok";
@@ -230,7 +230,7 @@
 };
 
 &lcds {
-	status = "okay";
+	status = "disabled";
 };
 
 &dpu_online2_hdmi {
