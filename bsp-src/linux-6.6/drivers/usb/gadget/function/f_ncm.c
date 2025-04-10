@@ -364,7 +364,11 @@ static struct usb_ss_ep_comp_descriptor ss_ncm_bulk_comp_desc = {
 	.bDescriptorType =	USB_DT_SS_ENDPOINT_COMP,
 
 	/* the following 2 values can be tweaked if necessary */
+#ifdef CONFIG_SOC_SPACEMIT_K1X
+	.bMaxBurst =		0,
+#else
 	.bMaxBurst =		15,
+#endif
 	/* .bmAttributes =	0, */
 };
 
@@ -1793,7 +1797,7 @@ static struct usb_function *ncm_alloc(struct usb_function_instance *fi)
 
 	ncm->port.wrap = ncm_wrap_ntb;
 	ncm->port.unwrap = ncm_unwrap_ntb;
-	pr_info("f_ncm: workaround for No-ZLP Host installed.\n");
+	pr_info("f_ncm: workaround for No-ZLP Host installed. no Burst\n");
 
 	return &ncm->port.func;
 }
