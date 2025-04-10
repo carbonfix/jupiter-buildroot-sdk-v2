@@ -793,7 +793,7 @@
 	emac,reset-active-low;
 	emac,reset-delays-us = <0 10000 100000>;
 
-        /* store forward mode */
+	/* store forward mode */
 	tx-threshold = <1518>;
 	rx-threshold = <12>;
 	tx-ring-num = <1024>;
@@ -956,7 +956,7 @@
 	status = "disabled";
 };
 
-/* CAM2: MIPI CSI3 data line2,3 clk lane2 */
+/* CAM0: MIPI CSI3 data line2,3 clk lane2 */
 &backsensor_aux {
 	cell-index = <1>;
 	twsi-index = <1>;
@@ -999,14 +999,15 @@
 
 	status = "okay";
 };
+
 &csiphy0 {
-
 	status = "okay";
 };
+
 &csiphy1 {
-
 	status = "okay";
 };
+
 &csiphy2 {
 	spacemit,bifmode-enable;
 
@@ -1125,9 +1126,9 @@
 };
 
 &i2s0 {
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_sspa0_0>;
-        status = "disabled";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_sspa0_0>;
+	status = "disabled";
 };
 
 &hdmiaudio {
