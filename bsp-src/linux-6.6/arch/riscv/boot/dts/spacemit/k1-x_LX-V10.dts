@@ -238,8 +238,8 @@
 		interrupt-parent = <&gpio>;
 		interrupts = <126 1>;
 		spk-ctl-gpio = <&gpio 127 0>;
-		everest,mic1-src = [44];
-		everest,mic2-src = [66];
+		everest,mic1-src = [00];
+		everest,mic2-src = [00];
 		status = "okay";
 	};
 };
