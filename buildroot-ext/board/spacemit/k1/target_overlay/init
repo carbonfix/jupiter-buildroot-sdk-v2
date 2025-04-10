@@ -14,7 +14,7 @@ for x in $(cat /proc/cmdline); do
 			;;
 		root=UUID=*)
 			ROOT=${x#root=UUID=}
-			ROOT=$(blkid | grep "$ROOT" | awk -F ':' '{print $1}')
+			ROOT=$(busybox blkid | grep "$ROOT" | awk -F ':' '{print $1}')
 			;;
 		root=*)
 			ROOT=${x#root=}
