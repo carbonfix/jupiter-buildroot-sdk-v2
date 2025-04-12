@@ -179,7 +179,7 @@
 
 	fan: pwm-fan {
 		compatible = "pwm-fan";
-		pwms = <&rpwm2 10000>;
+		pwms = <&pwm14 10000>;
 		#cooling-cells = <2>;
 		cooling-levels = <0 64 128 192 255>;
 		status = "okay";
@@ -547,7 +547,6 @@
 
 &pinctrl {
 	pinctrl-single,gpio-range = <
-		&range GPIO_44  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_45  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_46  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_49  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
@@ -570,7 +569,6 @@
 		&range GPIO_113 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_114 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_115 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
-		&range GPIO_116 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_118 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_119 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_120 1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
@@ -630,6 +628,12 @@
 	pinctrl_wlan_wakeup: wlan_wakeup_grp {
 		pinctrl-single,pins =<
 			K1X_PADCONF(GPIO_66, MUX_MODE0, (EDGE_FALL | PULL_DOWN | PAD_3V_DS2))   /* wifi edge detect */
+		>;
+	};
+
+	pinctrl_rpwm1_2: rpwm1_2_grp {
+		pinctrl-single,pins = <
+			K1X_PADCONF(GPIO_116, MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_1V8_DS2))	/* rpwm1 */
 		>;
 	};
 };
@@ -910,7 +914,7 @@
 };
 
 &pwm_bl {
-	pwms = <&pwm14 2000>;
+	pwms = <&rpwm1 2000>;
 	brightness-levels = <
 		0   40  40  40  40  40  40  40  40  40  40  40  40  40  40  40
 		40  40  40  40  40  40  40  40  40  40  40  40  40  40  40  40
@@ -1146,8 +1150,8 @@
 	status = "disabled";
 };
 
-&rpwm2 {
+&rpwm1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rpwm2_0>;
+	pinctrl-0 = <&pinctrl_rpwm1_2>;
 	status = "okay";
 };
