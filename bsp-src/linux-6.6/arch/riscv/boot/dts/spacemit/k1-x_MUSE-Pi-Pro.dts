@@ -920,7 +920,7 @@
 	status = "okay";
 	reset-on-resume;
 	dwc3@c0a00000 {
-		dr_mode = "otg";
+		dr_mode = "host";
 		phy_type = "utmi";
 		snps,hsphy_interface = "utmi";
 		snps,dis_enblslpm_quirk;
@@ -929,8 +929,6 @@
 		snps,dis-del-phy-power-chg-quirk;
 		snps,dis-tx-ipgap-linecheck-quirk;
 		snps,parkmode-disable-ss-quirk;
-		usb-role-switch;
-		role-switch-default-mode = "host";
 	};
 };
 
