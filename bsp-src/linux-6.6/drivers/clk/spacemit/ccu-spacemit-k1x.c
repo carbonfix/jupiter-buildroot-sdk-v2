@@ -1640,7 +1640,6 @@ void spacemit_clocks_init_rate(struct clk_hw_table *tbl, int tbl_size)
 		clk = clk_hw_get_clk(spacemit_k1x_hw_clks.hws[tbl[i].clk_hw_id], tbl[i].name);
 		if (!IS_ERR_OR_NULL(clk)) {
 			clk_set_rate(clk, tbl[i].rate);
-			clk_get_rate(clk);
 		}
 		else
 			pr_err("%s : can't find clk %s\n", __func__, tbl[i].name);

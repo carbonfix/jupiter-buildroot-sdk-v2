@@ -50,6 +50,7 @@ struct ccu_common {
 	unsigned long	flags;
 	spinlock_t	*lock;
 	struct clk_hw	hw;
+	unsigned long	rate;
 };
 
 struct spacemit_k1x_clk {

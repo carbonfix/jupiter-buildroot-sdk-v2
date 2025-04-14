@@ -194,16 +194,22 @@ static unsigned long ccu_mix_recalc_rate(struct clk_hw *hw,
 	struct ccu_mix *mix = hw_to_ccu_mix(hw);
 	struct ccu_common * common = &mix->common;
 	struct ccu_div_config *div = mix->div;
+	struct ccu_mux_config *mux = mix->mux ? mix->mux : NULL;
 	unsigned long val;
 	u32 reg;
 
-	if (!div){
+	if (!div) {
+		if (mux && common->rate && common->rate != parent_rate)
+			parent_rate = common->rate;
+
 		if (mix->factor)
-			return parent_rate * mix->factor->mul / mix->factor->div;
+			val = parent_rate * mix->factor->mul / mix->factor->div;
 		else
-		    return parent_rate;
+			val = parent_rate;
+
+		goto end;
 	}
-    if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
+	if (common->reg_type == CLK_DIV_TYPE_2REG_NOFC_V3
 		|| common->reg_type == CLK_DIV_TYPE_2REG_FC_V4)
 		reg = readl(common->base + common->reg_sel);
 	else
@@ -215,6 +221,8 @@ static unsigned long ccu_mix_recalc_rate(struct clk_hw *hw,
 	val = divider_recalc_rate(hw, parent_rate, val, div->table,
 				  div->flags, div->width);
 
+end:
+	common->rate = val;
 	return val;
 }
 
@@ -338,6 +346,8 @@ static int ccu_mix_set_rate(struct clk_hw *hw, unsigned long rate,
 	}
 
 	best_rate = ccu_mix_calc_best_rate(hw, rate, &mux_val, &div_val);
+	common->rate = best_rate;
+
 	if (!strcmp(common->name, tswi8_clk_name)){
 		if(mux){
 		cur_mux = twsi8_reg_val >> mux->shift;

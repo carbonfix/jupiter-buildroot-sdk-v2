@@ -58,7 +58,8 @@ struct ccu_ddn {
 		.ddn	= _SPACEMIT_CCU_DDN_CONFIG(_info, _table, _size),	\
 		.common = { 					\
 			.reg_ctrl		= _reg_ctrl, 			\
-			.base_type		= _base_type,	   \
+			.base_type		= _base_type,		\
+			.name			= _name,		\
 			.hw.init	= CLK_HW_INIT(_name,	\
 								  _parent, \
 								  &ccu_ddn_ops, \
@@ -75,7 +76,8 @@ struct ccu_ddn {
 		.common = { 					\
 			.reg_ctrl		= _reg_ddn,			\
 			.reg_sel		= __reg_gate,			\
-			.base_type		= _base_type,	   \
+			.base_type		= _base_type,		\
+			.name			= _name,		\
 			.hw.init	= CLK_HW_INIT(_name,	\
 								  _parent, \
 								  &ccu_ddn_ops, \
