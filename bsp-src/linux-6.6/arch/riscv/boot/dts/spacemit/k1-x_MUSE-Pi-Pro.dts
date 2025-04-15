@@ -912,6 +912,7 @@
 		&gpio 127 0	/* usb3 hub en */
 		&gpio 123 0>;	/* usb3 hub rst*/
 	vbus-gpios = <&gpio 79 0>;	/* usb3 hub output vbus */
+	vbus_delay_ms = <200>;
 	status = "okay";
 };
 
