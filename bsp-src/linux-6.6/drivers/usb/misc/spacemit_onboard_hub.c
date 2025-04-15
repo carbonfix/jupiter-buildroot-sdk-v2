@@ -222,7 +222,7 @@ static int spacemit_hub_resume(struct device *dev)
 }
 
 static const struct dev_pm_ops spacemit_onboard_hub_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(spacemit_hub_suspend, spacemit_hub_resume)
+	SET_LATE_SYSTEM_SLEEP_PM_OPS(spacemit_hub_suspend, spacemit_hub_resume)
 };
 #define DEV_PM_OPS	(&spacemit_onboard_hub_pm_ops)
 #else
