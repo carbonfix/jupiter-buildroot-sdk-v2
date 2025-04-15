@@ -1069,8 +1069,8 @@
 			reg = <0x0 0xd4026000 0x0 0x30>;
 			k1x,ssp-id = <0>;
 			k1x,ssp-clock-rate = <26000000>;
-			dmas = <&pdma0 19 1
-				&pdma0 18 1>;
+			dmas = <&pdma0 DMA_SSPA0_RX 1
+				&pdma0 DMA_SSPA0_TX 1>;
 			dma-names = "rx", "tx";
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 			cpuidle,pm-runtime,sleep;
@@ -1090,8 +1090,8 @@
 			reg = <0x0 0xd4026800 0x0 0x30>;
 			k1x,ssp-id = <1>;
 			k1x,ssp-clock-rate = <26000000>;
-			dmas = <&pdma0 21 1
-				&pdma0 20 1>;
+			dmas = <&pdma0 DMA_SSPA1_RX 1
+				&pdma0 DMA_SSPA1_TX 1>;
 			dma-names = "rx", "tx";
 			power-domains = <&power K1X_PMU_BUS_PWR_DOMAIN>;
 			cpuidle,pm-runtime,sleep;
