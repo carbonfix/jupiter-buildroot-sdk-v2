@@ -331,11 +331,6 @@ void porta_rterm(struct k1x_pcie *k1x)
 	val |= 0x1 << 8;
 	k1x_pcie_phy0_reg_writel(k1x, (0x17 << 2), val);
 
-	//REG32(0xC0B10000 + 0x400 + (0x17 << 2)) |= 0x1 << 8;
-	val = k1x_pcie_phy0_reg_readl(k1x, 0x400 + (0x17 << 2));
-	val |= 0x1 << 8;
-	k1x_pcie_phy0_reg_writel(k1x, 0x400 + (0x17 << 2), val);
-
 	//REG32(0xC0B10000 + (0x12 << 2)) &= 0xffff0fff;
 	val = k1x_pcie_phy0_reg_readl(k1x, (0x12 << 2));
 	val &= 0xffff0fff;
@@ -368,12 +363,6 @@ void porta_rterm(struct k1x_pcie *k1x)
 	k1x_pcie_phy0_reg_writel(k1x, (0x06 << 2), val);
 	pr_debug("Now waiting portA resister tuning done...\n");
 
-	// force PCIE mpu_u3/pu_rx_lfps
-	//REG32(PCIE_PUPHY_REG_BASE + 0x6 * 4) |= (0x1 << 17) | (0x1 << 15);
-	val = k1x_pcie_phy_reg_readl(k1x, (0x6 * 4));
-	val |= ((0x1 << 17) | (0x1 << 15));
-	k1x_pcie_phy_reg_writel(k1x, (0x6 * 4), val);
-
 	// wait pm0 rterm done
 	count = 0;
 	do
@@ -401,6 +390,7 @@ void rterm_force(struct k1x_pcie *k1x, u32 pcie_rcal)
 	for (i = 0; i < lane; i++)
 	{
 		val = k1x_pcie_phy_reg_readl(k1x, ((0x14 << 2) + 0x400 * i));
+		val &= ~(0xf << 8);
 		val |= ((pcie_rcal & 0xf) << 8);
 		k1x_pcie_phy_reg_writel(k1x, ((0x14 << 2) + 0x400 * i), val);
 	}
@@ -416,6 +406,7 @@ void rterm_force(struct k1x_pcie *k1x, u32 pcie_rcal)
 	for (i = 0; i < lane; i++)
 	{
 		val = k1x_pcie_phy_reg_readl(k1x, ((0x19 << 2) + 0x400 * i));
+		val &= ~(0xf << 12);
 		val |= ((pcie_rcal >> 4) & 0xf) << 12;
 		k1x_pcie_phy_reg_writel(k1x, ((0x19 << 2) + 0x400 * i), val);
 	}
@@ -465,11 +456,6 @@ void rterm_force(struct k1x_pcie *k1x, u32 pcie_rcal)
 		val |= (1 << 22);
 		k1x_pcie_phy_reg_writel(k1x, ((0x8 << 2) + 0x400 * i), val);
 	}
-
-	// release forc PCIE mpu_u3/pu_rx_lfps
-	val = k1x_pcie_phy_reg_readl(k1x, 0x6 * 4);
-	val &= 0xFFFD7FFF;
-	k1x_pcie_phy_reg_writel(k1x, 0x6 * 4, val);
 }
 
 static int init_phy(struct k1x_pcie *k1x)
@@ -883,9 +869,6 @@ void k1x_pcie_msix_addr_alloc(struct dw_pcie_rp *pp)
 	reg = k1x_pcie_phy_ahb_readl(k1x, ADDR_MSI_RECV_CTRL);
 	reg |= MSIX_MON_EN;
 	k1x_pcie_phy_ahb_writel(k1x, ADDR_MSI_RECV_CTRL, reg);
-	reg = k1x_pcie_phy_ahb_readl(k1x, ADDR_MSIX_MON_MASK);
-	reg |= 0xA;
-	k1x_pcie_phy_ahb_writel(k1x, ADDR_MSIX_MON_MASK, reg);
 	k1x_pcie_phy_ahb_writel(k1x, ADDR_MSIX_MON_BASE0, (lower_32_bits(msi_target) >> 2));
 }
 
