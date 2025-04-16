@@ -175,6 +175,12 @@
 			status = "okay";
 		};
 
+		ekey-bt {
+			label = "ekey-bt";
+			gpios = <&gpio 45 GPIO_ACTIVE_LOW>;
+			default-state = "on";
+			status = "okay";
+		};
 	};
 
 	fan: pwm-fan {
@@ -547,7 +553,7 @@
 
 &pinctrl {
 	pinctrl-single,gpio-range = <
-		&range GPIO_45  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range GPIO_45  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_46  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_49  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_58  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
@@ -640,6 +646,7 @@
 
 &gpio{
 	gpio-ranges = <
+		&pinctrl 45  GPIO_45  1
 		&pinctrl 49  GPIO_49  2
 		&pinctrl 58  GPIO_58  1
 		&pinctrl 63  GPIO_63  3
