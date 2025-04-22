@@ -17,6 +17,8 @@
 #include <linux/mailbox_client.h>
 #include <linux/completion.h>
 #include <linux/freezer.h>
+#include <linux/firmware.h>
+#include <linux/elf.h>
 #include <uapi/linux/sched/types.h>
 #include <uapi/linux/sched.h>
 #include <linux/sched/prio.h>
@@ -31,6 +33,7 @@
 #include <linux/spacemit/platform_pm_ops.h>
 #include <linux/suspend.h>
 #include "../remoteproc_internal.h"
+#include "../remoteproc_elf_helpers.h"
 
 #define MAX_MEM_BASE	2
 #define MAX_MBOX	2
@@ -83,6 +86,7 @@ struct spacemit_rproc {
 	unsigned int ddr_remap_base;
 	void __iomem *base[MAX_MEM_BASE];
 	struct spacemit_mbox *mb;
+	char *verid;
 #ifdef CONFIG_PM_SLEEP
 	struct rpmsg_device *rpdev;
 #ifdef CONFIG_HIBERNATION
@@ -198,9 +202,69 @@ static int spacemit_rproc_prepare(struct rproc *rproc)
 	return 0;
 }
 
+static const void *find_version_id_section(struct device *dev, const struct firmware *fw)
+{
+	const void *shdr, *name_table_shdr;
+	int i;
+	const char *name_table;
+	const u8 *elf_data = (void *)fw->data;
+	u8 class = fw_elf_get_class(fw);
+	const void *ehdr = elf_data;
+	u16 shnum = elf_hdr_get_e_shnum(class, ehdr);
+	u32 elf_shdr_get_size = elf_size_of_shdr(class);
+	u16 shstrndx = elf_hdr_get_e_shstrndx(class, ehdr);
+
+	/* First, get the section header according to the elf class */
+	shdr = elf_data + elf_hdr_get_e_shoff(class, ehdr);
+	/* Compute name table section header entry in shdr array */
+	name_table_shdr = shdr + (shstrndx * elf_shdr_get_size);
+	/* Finally, compute the name table section address in elf */
+	name_table = elf_data + elf_shdr_get_sh_offset(class, name_table_shdr);
+
+	for (i = 0; i < shnum; i++, shdr += elf_shdr_get_size) {
+		u32 name = elf_shdr_get_sh_name(class, shdr);
+
+		if (strcmp(name_table + name, ".version_id_table"))
+			continue;
+
+		/* make sure we have the entire table */
+		return shdr;
+	}
+
+	return NULL;
+}
+
+char *rproc_elf_find_version_id_table(struct rproc *rproc, const struct firmware *fw, u64 *sh_size_p)
+{
+	const void *shdr;
+	u64 sh_addr, sh_size;
+	u8 class = fw_elf_get_class(fw);
+	struct device *dev = &rproc->dev;
+
+	shdr = find_version_id_section(&rproc->dev, fw);
+	if (!shdr)
+		return NULL;
+
+	sh_addr = elf_shdr_get_sh_addr(class, shdr);
+	sh_size = elf_shdr_get_sh_size(class, shdr);
+
+	if (!rproc_u64_fit_in_size_t(sh_size)) {
+		dev_err(dev, "size (%llx) does not fit in size_t type\n",
+			sh_size);
+		return NULL;
+	}
+
+	*sh_size_p = sh_size;
+
+	return (char *)sh_addr;
+}
+
 static int spacemit_rproc_start(struct rproc *rproc)
 {
 	struct spacemit_rproc *priv = rproc->priv;
+
+	if (priv->verid != NULL)
+		pr_notice("the firmare version id is:%s\n", priv->verid);
 
 	/* enable ipc2ap clk & reset--> rcpu side */
 	writel(0xff, priv->base[BOOTC_MEM_BASE_OFFSET] + ESOS_AON_PER_CLK_RST_CTL_REG);
@@ -234,6 +298,21 @@ static int spacemit_rproc_stop(struct rproc *rproc)
 static int spacemit_rproc_parse_fw(struct rproc *rproc, const struct firmware *fw)
 {
 	int ret;
+	u64 sh_size;
+	struct spacemit_rproc *ddata = rproc->priv;
+	char *version_id_table, *version_id_va;
+
+	ddata->verid = NULL;
+	/* find the firmare id */
+	version_id_table = rproc_elf_find_version_id_table(rproc, fw, &sh_size);
+	if (!version_id_table) {
+		dev_info(&rproc->dev, "Can not find version id table\n");
+	} else {
+
+		version_id_va = ioremap((phys_addr_t)version_id_table, sh_size);
+
+		ddata->verid = version_id_va;
+	}
 
 	ret = rproc_elf_load_rsc_table(rproc, fw);
 	if (ret)
