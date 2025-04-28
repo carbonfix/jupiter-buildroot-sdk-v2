@@ -291,8 +291,58 @@
 
 &i2c3 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_i2c3_2>;
-	status = "disabled";
+	pinctrl-0 = <&pinctrl_i2c3_1>;
+	spacemit,i2c-fast-mode;
+	status = "okay";
+
+	gt9xx: gt9xx@14 {
+		compatible = "goodix,gt9xx";
+		reg = <0x14>;
+
+		//interrupt-parent = <&gpio>;
+		//interrupts = <97 2>;
+		irq-gpios = <&gpio 97 GPIO_ACTIVE_HIGH>;
+		irq-flags = <2>;
+		reset-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
+
+		touchscreen-max-id = <11>;
+		touchscreen-size-x = <1200>;
+		touchscreen-size-y = <1920>;
+		touchscreen-max-w = <512>;
+		touchscreen-max-p = <512>;
+
+		goodix,int-sync = <1>;
+
+		goodix,driver-send-cfg = <1>;
+		goodix,cfg-group0 = [
+			41 B0 04 80 07 05 35 30
+			01 08 19 05 50 32 03 05
+			00 00 00 00 33 33 00 1A
+			18 1E 14 90 30 AA 2A 28
+			12 0C 00 00 00 9B 03 2D
+			00 00 00 00 00 00 00 00
+			00 00 00 1E 50 94 C5 02
+			08 00 00 04 86 21 00 71
+			28 00 5F 31 00 51 3B 00
+			45 48 00 45 00 00 00 00
+			00 00 00 00 00 00 00 00
+			00 00 00 00 00 00 00 00
+			00 00 00 00 00 00 00 00
+			00 00 00 00 00 00 00 00
+			19 18 17 16 15 14 11 10
+			0F 0E 0D 0C 09 08 07 06
+			05 04 01 00 00 00 00 00
+			00 00 00 00 00 00 2A 29
+			28 27 26 25 24 23 22 21
+			20 1F 1E 1C 1B 19 00 02
+			04 06 07 08 0A 0C 0D 0E
+			0F 10 11 12 13 14 00 00
+			00 00 00 00 00 00 00 00
+			18 01
+		];
+
+		status = "okay";
+	};
 };
 
 &i2c4 {
@@ -305,25 +355,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c6_2>;
 	status = "disabled";
-
-	gt9xx@5d {
-		compatible = "goodix,gt9xx";
-		reg = <0x5d>;
-
-		reset-gpios = <&gpio 124 GPIO_ACTIVE_HIGH>;
-		irq-gpios = <&gpio 58 GPIO_ACTIVE_HIGH>;
-		irq-flags = <2>;
-
-		touchscreen-max-id = <11>;
-		touchscreen-size-x = <1200>;
-		touchscreen-size-y = <1920>;
-		touchscreen-max-w = <512>;
-		touchscreen-max-p = <512>;
-
-		goodix,int-sync = <1>;
-		status = "disabled";
-	};
-
 };
 
 &i2c7 {
@@ -569,7 +600,7 @@
 		&range GPIO_90  1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_91  2 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range DVL0     1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
-		&range DVL1     1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS0)
+		&range DVL1     1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_110 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_111 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 		&range GPIO_113 1 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
@@ -584,12 +615,12 @@
 		&range GPIO_125 3 (MUX_MODE0 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
 	>;
 
-	pinctrl_rcpu: pinctrl_rcpu_grp {
-		pinctrl-single,pins = <
-			K1X_PADCONF(GPIO_47,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_tx */
-			K1X_PADCONF(GPIO_48,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_rx */
-		>;
-	};
+	//pinctrl_rcpu: pinctrl_rcpu_grp {
+	//	pinctrl-single,pins = <
+	//		K1X_PADCONF(GPIO_47,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_tx */
+	//		K1X_PADCONF(GPIO_48,   MUX_MODE1, (EDGE_NONE | PULL_UP | PAD_3V_DS4))	/* r_uart0_rx */
+	//	>;
+	//};
 
 	pinctrl_gmac0: gmac0_grp {
 		pinctrl-single,pins =<
@@ -865,11 +896,6 @@
 };
 
 &usb3hub {
-	//hub-gpios = <
-		//&gpio 123 0>;	/* usb3 hub en */
-	//vbus-gpios = <
-		//&gpio 97 0	/* gpio_97 for usb3 hub output vbus */
-		//&gpio 127 0>;   /* gpio_127 for usb2_hub output vbus*/
 	status = "okay";
 };
 
@@ -1006,7 +1032,7 @@
 	pinctrl-0 = <&pinctrl_camera0>;
 
 	pwdn-gpios = <&gpio 113 0>;
-	reset-gpios = <&gpio 124 0>;
+	reset-gpios = <&gpio 123 0>;
 
 	status = "okay";
 };
@@ -1053,8 +1079,8 @@
 };
 
 &rcpu {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_rcpu>;
+	//pinctrl-names = "default";
+	//pinctrl-0 = <&pinctrl_rcpu>;
 	mboxes = <&mailbox 0>, <&mailbox 1>;
 	mbox-names = "vq0", "vq1";
 	memory-region = <&rcpu_mem_0>, <&rcpu_mem_heap>, <&vdev0vring0>, <&vdev0vring1>, <&vdev0buffer>, <&rsc_table>, <&rcpu_mem_snapshots>;
