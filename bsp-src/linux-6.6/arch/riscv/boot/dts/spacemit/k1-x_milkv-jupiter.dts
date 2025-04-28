@@ -259,7 +259,7 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c1>;
 	spacemit,i2c-fast-mode;
-	status = "okay";
+	status = "disabled";
 };
 
 &i2c2 {
@@ -314,14 +314,14 @@
 &i2c6 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c6_2>;
-	status = "disabled";
+	status = "okay";
 
 	gt9xx@5d {
 		compatible = "goodix,gt9xx";
 		reg = <0x5d>;
 
-		reset-gpios = <&gpio 114 GPIO_ACTIVE_HIGH>;
-		irq-gpios = <&gpio 58 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio 70 GPIO_ACTIVE_HIGH>;
+		irq-gpios = <&gpio 72 GPIO_ACTIVE_HIGH>;
 		irq-flags = <2>;
 
 		touchscreen-max-id = <11>;
@@ -331,9 +331,8 @@
 		touchscreen-max-p = <512>;
 
 		goodix,int-sync = <1>;
-		status = "disabled";
+		status = "okay";
 	};
-
 };
 
 &i2c7 {
@@ -569,8 +568,8 @@
 		&range GPIO_65  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_67  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range PRI_TDI  2 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
-		&range PRI_TCK  1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)
-		&range PRI_TDO  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
+		&range PRI_TCK  1 (MUX_MODE1 | EDGE_NONE | PULL_DOWN | PAD_1V8_DS2)	/* GPIO72 TP_INT */
+		&range PRI_TDO  1 (MUX_MODE1 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)	/* GPIO70 TP_RST */
 		&range GPIO_74  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
 		&range GPIO_80  1 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_3V_DS4)
 		&range GPIO_81  3 (MUX_MODE0 | EDGE_NONE | PULL_UP   | PAD_1V8_DS2)
