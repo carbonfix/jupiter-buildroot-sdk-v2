@@ -30,6 +30,8 @@ char *pFbcCase0Header  = "/usr/share/v2d/adv_320_240_rgb888_s1_header.fbc";
 char *pFbcCase0Body    = "/usr/share/v2d/adv_320_240_rgb888_s1_payload.fbc";
 char *pFbcCase0Raw     = "/usr/share/v2d/adv_320_240_rgb888.raw";
 char *pRawData         = "/usr/share/v2d/320_240_bt601_n.yuv";
+char *pNV12Data         = "/usr/share/v2d/1920_1080_bt601_nv12.yuv";
+char *pRGBA8888Data         = "/usr/share/v2d/1920_1080_rgba8888.rgb";
 char *sysfile          = "/sys/bus/platform/devices/c0100000.v2d/clkrate";
 
 struct v2d_alloc_dma_buf {
@@ -81,7 +83,7 @@ int writeFile(char *pFileName, int size, void* pBuff)
 	int ret = 0;
 	unsigned int filesize = 0;
 
-	FILE* pImageFile = fopen(pFileName, "rb");
+	FILE* pImageFile = fopen(pFileName, "wb");
 	if (!pImageFile)
 	{
 		printf("Error in read %s,file not found\n", pFileName);
@@ -104,6 +106,125 @@ void destroyAllocator()
 		FreeDmabufHeapBufferAllocator(bufferAllocator);
 		bufferAllocator = NULL;
 	}
+}
+
+int v2d_yuv2rgb_test(void)
+{
+	int ret = 0;
+	V2D_HANDLE hHandle;
+	V2D_SURFACE_S stBackGround, stForeGround, stDst;
+	V2D_AREA_S stBackGroundRect, stForeGroundRect, stDstRect;
+	V2D_BLEND_CONF_S stBlendConf;
+	V2D_ROTATE_ANGLE_E enForeRotate, enBackRotate;
+	V2D_CSC_MODE_E enForeCSCMode, enBackCSCMode;
+	V2D_DITHER_E dither;
+	void *tmp = NULL;
+	int i;
+	unsigned int *real, *expect;
+	bool cpu_access_need = true;
+
+	struct v2d_alloc_dma_buf in, out;
+	void *pLayer0, *pLayer1, *pDst;
+	unsigned int mapsize0, mapsize1, mapsize2;
+
+	V2DLOGD("v2d yuv2rgb test start\n");
+	in.size    = (1920*1080*3) / 2;
+	out.size   = 1920*1080*4;
+	mapsize0   = ALIGN_UP(in.size,  PAGESIZE);
+	mapsize2   = ALIGN_UP(out.size, PAGESIZE);
+
+	createAllocator();
+	in.fd = DmabufHeapAllocSystem(bufferAllocator, cpu_access_need, mapsize0, 0, 0);
+	out.fd = DmabufHeapAllocSystem(bufferAllocator, cpu_access_need, mapsize2, 0, 0);
+	printf("dmabuf fd:%u, %u\n", in.fd, out.fd);
+	pLayer0 = mmap(NULL, mapsize0, PROT_READ | PROT_WRITE, MAP_SHARED, in.fd, 0);
+	if (pLayer0 == MAP_FAILED) {
+		V2DLOGD(" v2d mmap layer0 failed\n");
+	}
+	pDst = mmap(NULL, mapsize2, PROT_READ | PROT_WRITE, MAP_SHARED, out.fd, 0);
+	if (pDst == MAP_FAILED) {
+		V2DLOGD(" v2d mmap dst failed\n");
+	}
+	ret = readFile(pNV12Data, pLayer0);
+	memset(pDst, 0,  ALIGN_UP(out.size, PAGESIZE));
+	//config layer0
+	enBackRotate  = V2D_ROT_0;
+	enBackCSCMode = V2D_CSC_MODE_BT709NARROW_2_RGB;
+	memset(&stBackGround, 0, sizeof(V2D_SURFACE_S));
+	stBackGround.fbc_enable = 0;
+	stBackGround.fd         = in.fd;
+	stBackGround.offset     = 1920*1080;
+	stBackGround.w          = 1920;
+	stBackGround.h          = 1080;
+	stBackGround.stride     = 1920;
+	stBackGround.format     = V2D_COLOR_FORMAT_NV12;
+	stBackGroundRect.x      = 0;
+	stBackGroundRect.y      = 0;
+	stBackGroundRect.w      = 1920;
+	stBackGroundRect.h      = 1080;
+	//config layer1
+	enForeRotate  = V2D_ROT_0;
+	enForeCSCMode = V2D_CSC_MODE_BUTT;
+	//config output
+	dither        = V2D_NO_DITHER;
+	memset(&stDst, 0, sizeof(V2D_SURFACE_S));
+	stDst.fbc_enable = 0;
+	stDst.fd         = out.fd;
+	stDst.offset     = 0x00;
+	stDst.w          = 1920;
+	stDst.h          = 1080;
+	stDst.stride     = 1920*4;
+	stDst.format     = V2D_COLOR_FORMAT_BGRA8888;
+	stDstRect.x      = 0;
+	stDstRect.y      = 0;
+	stDstRect.w      = 1920;
+	stDstRect.h      = 1080;
+	//config blend layer
+	memset(&stBlendConf, 0, sizeof(V2D_BLEND_CONF_S));
+	stBlendConf.blendlayer[0].blend_area.x = 0;
+	stBlendConf.blendlayer[0].blend_area.y = 0;
+	stBlendConf.blendlayer[0].blend_area.w = 1920;
+	stBlendConf.blendlayer[0].blend_area.h = 1080;
+
+	ret = V2D_BeginJob(&hHandle);
+	if (ret) {
+		V2DLOGD("V2D_BeginJob err\n");
+		return ret;
+	}
+
+	ret = V2D_AddBlendTask(hHandle, &stBackGround, &stBackGroundRect, NULL, NULL, NULL, NULL, &stDst,
+								&stDstRect, &stBlendConf, enForeRotate, enBackRotate, enForeCSCMode, enBackCSCMode, NULL, dither);
+	if (ret) {
+		V2DLOGD("V2D_AddBlendTask err\n");
+		return ret;
+	}
+
+	ret = V2D_EndJob(hHandle);
+	if (ret) {
+		V2DLOGD("V2D_EndJob err\n");
+		return ret;
+	}
+	tmp = malloc(out.size);
+	if (!tmp) {
+		V2DLOGD("malloc fail\n");
+	}
+
+	readFile(pRGBA8888Data, tmp);
+	real = (unsigned int *)tmp;
+	expect = (unsigned int *)pDst;
+	for (i=0; i<out.size/4; i++) {
+		if (*(expect+i) != *(real+i)) {
+			V2DLOGD("i:%d,exp:0x%08x,real:0x%08x\n",i,*(expect+i),*(real+i));
+			ret = 1;
+			break;
+		}
+	}
+	munmap(pLayer0, mapsize0);
+	munmap(pDst,    mapsize2);
+	destroyAllocator();
+	V2DLOGD("%s\n", ret ? "v2d yuv2rgb test case failed!":"v2d yuv2rgb test case successful!");
+
+	return ret;
 }
 
 int v2d_adv(void)
@@ -170,9 +291,9 @@ int v2d_adv(void)
 	stBackGround.fbcDecInfo.enFbcdecMode= FBC_DECODER_MODE_SCAN_LINE;
 	//config layer1
 	enForeRotate  = V2D_ROT_0;
-	enForeCSCMode = V2D_CSC_MODE_BUTT;	
+	enForeCSCMode = V2D_CSC_MODE_BUTT;
 	//config output
-	dither        = V2D_NO_DITHER;	
+	dither        = V2D_NO_DITHER;
 	memset(&stDst, 0, sizeof(V2D_SURFACE_S));
 	stDst.fbc_enable = 0;
 	stDst.fd         = out.fd;
@@ -199,6 +320,7 @@ int v2d_adv(void)
 	stBlendConf.blendlayer[0].blend_area.y = 0;
 	stBlendConf.blendlayer[0].blend_area.w = 320;
 	stBlendConf.blendlayer[0].blend_area.h = 240;
+
 	ret = V2D_BeginJob(&hHandle);
 	if (ret) {
 		V2DLOGD("V2D_BeginJob err\n");
@@ -239,7 +361,7 @@ int v2d_adv(void)
 	munmap(pLayer0, mapsize0);
 	munmap(pDst,    mapsize2);
 	destroyAllocator();
-	V2DLOGD("v2d adv %s\n", ret ? "v2d blend test case failed!":"v2d blend test case successful!");
+	V2DLOGD("%s\n", ret ? "v2d blend test case failed!":"v2d blend test case successful!");
 
 	return ret;
 }
@@ -336,7 +458,7 @@ int v2d_SimpleCase(void)
 	stBlendConf.blendlayer[0].blend_area.y = 0;
 	stBlendConf.blendlayer[0].blend_area.w = 320;
 	stBlendConf.blendlayer[0].blend_area.h = 240;
-	V2DLOGD("V2D_BeginJob\n");
+
 	ret = V2D_BeginJob(&hHandle);
 	if (ret) {
 		V2DLOGD("V2D_BeginJob err\n");
@@ -377,7 +499,7 @@ int v2d_SimpleCase(void)
 	munmap(pLayer0, mapsize0);
 	munmap(pDst,    mapsize2);
 	destroyAllocator();
-	V2DLOGD("v2d simple %s\n", ret ? "v2d simple test case failed!":"v2d simple test case successful!");
+	V2DLOGD("%s\n", ret ? "v2d simple test case failed!":"v2d simple test case successful!");
 	return ret;
 }
 //fill test
@@ -463,7 +585,7 @@ int v2d_fill_test(void)
 fini:
 	munmap(pDst, mapsize);
 	destroyAllocator();
-	V2DLOGD("v2d fill test %s\n", ret ? "v2d fill test case failed!":"v2d fill test case successful!");
+	V2DLOGD("%s\n", ret ? "v2d fill test case failed!":"v2d fill test case successful!");
 	return ret;
 }
 //blit test
@@ -561,7 +683,7 @@ fini:
 	munmap(pSrc, mapsize0);
 	munmap(pDst, mapsize1);
 	destroyAllocator();
-	V2DLOGD("v2d blit test %s\n", ret ? "v2d blit test case failed!":"v2d blit test case successful!");
+	V2DLOGD("%s\n", ret ? "v2d blit test case failed!":"v2d blit test case successful!");
 	return ret;
 }
 int main(int argc, char** argv)
@@ -570,38 +692,47 @@ int main(int argc, char** argv)
 
 	if (argc < 2) {
 		printf("spacemit v2d test cases:\n");
-		printf("--rate 204M          default rate 204M \n");
-		printf("--rate 307M          default rate 307M \n");
-		printf("--rate 491M          default rate 491M \n");
-		printf("--blend              blend test case \n");
+		printf("--rate 200M          default rate 200M \n");
+		printf("--rate 300M          default rate 300M \n");
+		printf("--rate 400M          default rate 400M \n");
+		printf("--rate 500M          default rate 500M \n");
 		printf("--fill               fill test case \n");
-		printf("--blit               blit test cass \n");
+		printf("--blit               blit test case \n");
+		printf("--blend              blend test case \n");
+		printf("--yuv2rgb            yuv2rgb test case \n");
 		return -1;
 	}
 
-	if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "204M")  == 0)) {
+	if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "200M")  == 0)) {
 		write_sysfile(sysfile, "204800000");
 		ret = v2d_SimpleCase();
-	} else if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "307M")  == 0)) {
+	} else if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "300M")  == 0)) {
 		write_sysfile(sysfile, "307200000");
 		ret = v2d_SimpleCase();
-	} else if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "491M")  == 0)) {
+	} else if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "400M")  == 0)) {
+		write_sysfile(sysfile, "409600000");
+		ret = v2d_SimpleCase();
+	} else if ((argc == 3) && (strcmp(argv[1], "--rate")  == 0) && (strcmp(argv[2], "500M")  == 0)) {
 		write_sysfile(sysfile, "491520000");
 		ret = v2d_SimpleCase();
-	}  else if (strcmp(argv[1], "--blend") == 0) {
-		ret = v2d_adv();
 	} else if (strcmp(argv[1], "--fill") == 0) {
 		ret = ret = v2d_fill_test();
 	} else if (strcmp(argv[1], "--blit") == 0) {
 		ret = v2d_blit_test();
+	} else if (strcmp(argv[1], "--blend") == 0) {
+		ret = v2d_adv();
+	} else if (strcmp(argv[1], "--yuv2rgb") == 0) {
+		ret = v2d_yuv2rgb_test();
 	} else if (strcmp(argv[1], "--help") == 0) {
 		printf("spacemit v2d test cases:\n");
-		printf("--rate 204M          default rate 204M \n");
-		printf("--rate 307M          default rate 307M \n");
-		printf("--rate 491M          default rate 491M \n");
-		printf("--blend              blend test case \n");
+		printf("--rate 200M          default rate 200M \n");
+		printf("--rate 300M          default rate 300M \n");
+		printf("--rate 400M          default rate 400M \n");
+		printf("--rate 500M          default rate 500M \n");
 		printf("--fill               fill test case \n");
-		printf("--blit               blit test cass \n");
+		printf("--blit               blit test case \n");
+		printf("--blend              blend test case \n");
+		printf("--yuv2rgb            yuv2rgb test case \n");
 	} else {
 		printf("spacemit v2d test case, intput error!\n");
 	}
