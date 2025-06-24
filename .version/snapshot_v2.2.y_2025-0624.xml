@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <remote name="origin" fetch="git@gitee.com:bianbu-linux"/>
+  
+  <default remote="origin" revision="k1-bl-v2.2.y" sync-j="8"/>
+  
+  <project name="ai-support" path="package-src/ai-support" revision="41a304053fd3a26a92abab0df96a3637d59af005" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="buildroot" revision="cc7144bd87f6cf0a8d60c58a82c66d2ee017b532" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="buildroot-ext" revision="2d87ba5fc1d10a18232678c5979048a7d9a011fc" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="drm-test" path="package-src/drm-test" revision="86a9f204364578268d1be40212385c3438d4eb75" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="factorytest" path="package-src/factorytest" revision="bf0e94711a2730891fd3be2e615a8862bde3fd02" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="glmark2" path="package-src/glmark2" revision="c6ede6f18d939b68806683f5a569d8f89c8f79e0" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="img-gpu-powervr" path="package-src/img-gpu-powervr" revision="dbbd7d7fbefe627e5e544cdbcb7a5e202f69a679" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="jetson-utils" path="package-src/jetson-utils" revision="262dade9a7b8d93b714dcebb7a0195fe6af39240" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="k1x-cam" path="package-src/k1x-cam" revision="59421261ac0d00fb17d1ef6dfadb4ceeff08a352" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="k1x-jpu" path="package-src/k1x-jpu" revision="86555ac85ea20387c8714aab8cb52c30ec80e4b5" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="k1x-vpu-firmware" path="package-src/k1x-vpu-firmware" revision="144f5fd23646408573682b983f7f4225d62ac404" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="k1x-vpu-test" path="package-src/k1x-vpu-test" revision="f5d83cfbb1a4c5e99cd7c89734f18381ec4dff94" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="linux-6.6" path="bsp-src/linux-6.6" revision="50626b4a9d76e7ffa295ca5bb4549cca0b16ed87" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="mesa3d" path="package-src/mesa3d" revision="7829523a9f5e94e42359981229b92cb97dfe0add" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="mpp" path="package-src/mpp" revision="ff011c81ea810dd40a9897e9946a509455b94dd3" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="opensbi" path="bsp-src/opensbi" revision="e0bb974de1ed51ca8ee3b598437a30787142e192" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="rtk_hciattach" path="package-src/rtk_hciattach" revision="9ce1210f63cce2da2ee7a347fa7f71cfb764aa20" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="scripts" revision="9869a562d3d2693702c60676a20ade7fad1bf3e5" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y">
+    <copyfile src="Makefile" dest="Makefile"/>
+  </project>
+  <project name="uboot-2022.10" path="bsp-src/uboot-2022.10" revision="b26ef870d421e5f813708e848fff7f64ee80c26a" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="usb-gadget" path="package-src/usb-gadget" revision="dfc11f5c2c5e415e75ded95623266354fff34a04" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+  <project name="v2d-test" path="package-src/v2d-test" revision="32c524c85aa3a92ad1cf9eccc515e6ff434edccc" upstream="k1-bl-v2.2.y" dest-branch="k1-bl-v2.2.y"/>
+</manifest>
